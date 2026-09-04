@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CastLink — Plataforma Profissional de Gestão de Castings | Protótipo Visual Garimpo Sites</title>
+  <meta name="description" content="Protótipo conceitual para o novo ecossistema visual do CastLink: gestão profissional de castings para moda, publicidade, televisão, cinema e eventos.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Barra de Controle Garimpo Sites -->
+  <aside class="control-bar" aria-label="Controle de Prévia Garimpo Sites">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — READY FOR PREVIEW</span>
+      <span class="project-meta">Projeto: <strong>CastLink World</strong> | Versão: <strong>v1</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#demonstracao" class="btn-ctrl btn-ctrl-preview" title="Ir para formulário de demonstração">👁️ VER DEMONSTRAÇÃO</a>
+      <a href="castlink-world-v1-standalone.html" download="castlink-world-v1-standalone.html"  class="btn-ctrl btn-ctrl-download" title="Baixar protótipo autônomo offline">📥 BAIXAR PROTÓTIPO</a>
+    </div>
+  </aside>
+
+  <!-- Cabeçalho Institucional Luxury -->
+  <header class="header-main" role="banner">
+    <div class="nav-container">
+      <a href="#" class="brand-wrapper" aria-label="CastLink World Início">
+        <div class="brand-icon">CL</div>
+        <div class="brand-text">
+          <span class="brand-title">CastLink</span>
+          <span class="brand-subtitle">Casting Management Platform</span>
+        </div>
+      </a>
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="#solucao">Solução</a>
+        <a href="#metodologia">4 Etapas</a>
+        <a href="#cplp-case">CPLP Fashion Week</a>
+        <a href="#comparativo">Comparativo</a>
+        <a href="#demonstracao">Demonstração VIP</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="#demonstracao" class="btn-nav-auth">Acesso Restrito</a>
+        <a href="#demonstracao" class="btn-nav-cta">Solicitar Demo</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo-principal">
+    <!-- Hero Section Editorial -->
+    <section class="hero-section" aria-labelledby="hero-heading">
+      <div class="hero-content">
+        <div class="hero-pill-box">
+          <span class="pill-text">Alta Tecnologia para Produções de Elite</span>
+        </div>
+        <h1 id="hero-heading" class="hero-title">
+          A Nova Era da Gestão de Casting <em>em Alta Definição</em>
+        </h1>
+        <p class="hero-desc">
+          Substitua planilhas desorganizadas, links expirados e e-mails dispersos por uma infraestrutura centralizada e segura. Do registo de agências à votação privada de estilistas em tempo real.
+        </p>
+        <div class="hero-cta-group">
+          <a href="#demonstracao" class="btn-hero-primary">
+            <span>Solicitar Demonstração VIP</span>
+            <span>→</span>
+          </a>
+          <a href="#metodologia" class="btn-hero-secondary">
+            <span>Conhecer o Fluxo Operacional</span>
+          </a>
+        </div>
+        <div class="hero-trust-badges">
+          <div class="trust-item">
+            <span class="trust-icon">✓</span>
+            <span>5 Níveis de Acesso Segregados</span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon">🔒</span>
+            <span>Armazenamento Privado Cloudflare R2 / S3</span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon">🛡️</span>
+            <span>Conformidade Estrita RGPD & LGPD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mockup Card Interativo da Ficha do Talento -->
+      <div class="hero-visual-card" aria-label="Mockup da Ficha de Talento">
+        <div class="mockup-header">
+          <span class="mockup-tag">Casting Operacional • Painel Direção</span>
+          <span class="mockup-status-live">Sessão Ativa</span>
+        </div>
+        <div class="mockup-talent-row">
+          <div class="talent-photo-box">
+            <div class="talent-avatar-silhouette">👤</div>
+            <span class="talent-photo-badge">Comp. HD</span>
+          </div>
+          <div class="talent-details">
+            <div class="talent-meta-top">
+              <span class="talent-name">Aura Matos</span>
+              <span class="talent-code">#TAL-8024</span>
+            </div>
+            <span class="talent-agency">Agência: [AGÊNCIA A CONFIRMAR]</span>
+            <div class="talent-measurements-grid">
+              <div class="measure-item">
+                <span class="measure-label">Altura</span>
+                <span class="measure-val">1.79 m</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Busto</span>
+                <span class="measure-val">84 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Cintura</span>
+                <span class="measure-val">60 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Quadril</span>
+                <span class="measure-val">89 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Calçado</span>
+                <span class="measure-val">38 EU</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Olhos</span>
+                <span class="measure-val">Castanhos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-actions-bar">
+          <button type="button" class="btn-mock-action btn-mock-approve" onclick="this.innerHTML = '✓ Aprovado para Runway'; this.style.borderColor='#10b981';">
+            <span>✓</span> Selecionar para Passarela
+          </button>
+          <button type="button" class="btn-mock-action btn-mock-fitting" onclick="this.innerHTML = '🕒 Agendado para Fitting'; this.style.borderColor='#d4af37';">
+            <span>🕒</span> Convocar Fitting
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Faixa de Métricas e Indicadores -->
+    <section class="strip-numbers" aria-label="Indicadores da Plataforma">
+      <div class="strip-container">
+        <div class="stat-box">
+          <span class="stat-number">4 Etapas</span>
+          <span class="stat-desc">Fluxo operacional padronizado de ponta a ponta</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">5 Papéis</span>
+          <span class="stat-desc">Perfis segregados com permissões granulares</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">100%</span>
+          <span class="stat-desc">URLs temporárias com criptografia em repouso</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">RGPD</span>
+          <span class="stat-desc">Consentimento digital auditável e proteção de imagem</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pilares de Solução (3 Colunas) -->
+    <section id="solucao" class="section-wrapper">
+      <div class="section-header-center">
+        <span class="section-kicker">Arquitetura de Segurança & Controle</span>
+        <h2 class="section-title">Construído para a Exigência das Grandes Produções</h2>
+        <p class="section-subtitle">
+          Moda, publicidade, televisão, cinema e eventos corporativos demandam sigilo absoluto, agilidade operacional e rigor métrico.
+        </p>
+      </div>
+      <div class="pillars-grid">
+        <article class="pillar-card">
+          <div class="pillar-icon">🔒</div>
+          <h3 class="pillar-title">Permissões Segregadas</h3>
+          <p class="pillar-text">
+            Cinco perfis especializados: Administração, Direção de Casting, Estilistas Convidados, Agências e Modelos. Cada interveniente visualiza estritamente os dados e ferramentas autorizados para a sua função.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <div class="pillar-icon">⚡</div>
+          <h3 class="pillar-title">Storage Privado com Presigned URLs</h3>
+          <p class="pillar-text">
+            Fotos de polaroides, composites em alta resolução e vídeos de passarela nunca ficam expostos em links públicos. Acesso sob tokens temporários com autenticação multifator (MFA) via Supabase e Cloudflare R2 / S3.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <div class="pillar-icon">⚖️</div>
+          <h3 class="pillar-title">Conformidade RGPD & LGPD</h3>
+          <p class="pillar-text">
+            Termos de uso de imagem, direitos conexos e consentimentos digitais registrados e auditáveis em tempo real, eliminando riscos e passivos jurídicos para produtoras e marcas contratantes.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Metodologia: Workflow de 4 Etapas -->
+    <section id="metodologia" class="section-wrapper" style="background: rgba(14, 16, 22, 0.4); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+      <div class="section-header-center">
+        <span class="section-kicker">Metodologia Homologada</span>
+        <h2 class="section-title">O Fluxo Operacional em 4 Etapas</h2>
+        <p class="section-subtitle">
+          Uma jornada contínua que substitui dezenas de trocas de mensagens dispersas por um ecossistema sincronizado.
+        </p>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <span class="step-number">01</span>
+          <h3 class="step-title">Configurar Evento</h3>
+          <p class="step-text">
+            Definição do briefing, categorias de casting (passarela, comercial, editorial), prazos e vinculação segura dos estilistas convidados.
+          </p>
+          <span class="step-tag">Briefing & Estruturação</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">02</span>
+          <h3 class="step-title">Registar Participantes</h3>
+          <p class="step-text">
+            Submissão padronizada por agências credenciadas ou candidaturas diretas com fichas técnicas de medidas e composite obrigatório.
+          </p>
+          <span class="step-tag">Ingestão Padronizada</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">03</span>
+          <h3 class="step-title">Pré-Casting & Fitting</h3>
+          <p class="step-text">
+            Triagem operacional em tempo real, notas confidenciais de júri, agendamento de provas de vestuário e conferência física de medidas.
+          </p>
+          <span class="step-tag">Operação em Pista</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">04</span>
+          <h3 class="step-title">Seleção & Relatórios</h3>
+          <p class="step-text">
+            Geração instantânea de relatórios executivos finais, exportação de line-ups para backstage e formalização contratual dos selecionados.
+          </p>
+          <span class="step-tag">Decisão Executiva</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Estudo de Caso de Referência: CPLP Fashion Week -->
+    <section id="cplp-case" class="section-wrapper">
+      <div class="case-feature">
+        <div>
+          <span class="case-badge">Produção de Referência</span>
+          <h2 class="case-title">CPLP Fashion Week</h2>
+          <p class="case-desc">
+            Na 4ª edição em Lisboa (maio de 2026), a CPLP Fashion Week utilizou a infraestrutura CastLink para orquestrar o processo de seleção internacional de modelos entre múltiplos países lusófonos, estilistas e agências parceiras com zero atrito de comunicação.
+          </p>
+          <div class="case-metrics-list">
+            <div class="case-metric-box">
+              <span class="case-metric-val">4ª Edição</span>
+              <span class="case-metric-lbl">Lisboa, Portugal (Maio 2026)</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">100% Digital</span>
+              <span class="case-metric-lbl">Fichas técnicas e votação em tempo real</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">Multipaíses</span>
+              <span class="case-metric-lbl">Modelos e agências de toda a CPLP</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">Zero Planilhas</span>
+              <span class="case-metric-lbl">Backstage totalmente integrado</span>
+            </div>
+          </div>
+        </div>
+        <div class="case-quote-card">
+          <span class="quote-mark">“</span>
+          <p class="quote-text">
+            A CastLink elevou a curadoria e a seleção da CPLP Fashion Week ao mais rigoroso patamar internacional. A agilidade nas medições e a confidencialidade das escolhas dos estilistas foram decisivas para o sucesso do evento.
+          </p>
+          <span class="quote-author">Produção Executiva — CPLP Fashion Week Lisboa</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela Comparativa de Recursos -->
+    <section id="comparativo" class="section-wrapper" style="background: rgba(14, 16, 22, 0.4); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+      <div class="section-header-center">
+        <span class="section-kicker">Eficiência Comprovada</span>
+        <h2 class="section-title">Planilhas & Grupos de WhatsApp vs. CastLink</h2>
+        <p class="section-subtitle">
+          Veja por que grandes produtoras e semanas de moda abandonaram métodos improvisados em favor de uma plataforma dedicada.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 35%;">Critério Operacional</th>
+              <th scope="col" style="width: 32%;">Processo Tradicional (Planilhas & WhatsApp)</th>
+              <th scope="col" class="col-castlink" style="width: 33%;">Plataforma CastLink Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Armazenamento de Fotos e Vídeos</strong></td>
+              <td>Links expirados do WeTransfer/Drive dispersos em mensagens</td>
+              <td class="col-castlink">Storage R2/S3 com URLs temporárias e criptografia nativa</td>
+            </tr>
+            <tr>
+              <td><strong>Privacidade e Separação de Acessos</strong></td>
+              <td>Todos veem tudo; risco constante de vazamento de dados e cachês</td>
+              <td class="col-castlink">5 níveis de permissão: estilista só vota, agência só gere seus modelos</td>
+            </tr>
+            <tr>
+              <td><strong>Padronização de Medidas</strong></td>
+              <td>Formatos arbitrários em conversas sem validação técnica</td>
+              <td class="col-castlink">Ficha técnica padronizada (altura, busto, cintura, quadril, calçado)</td>
+            </tr>
+            <tr>
+              <td><strong>Segurança Jurídica & RGPD</strong></td>
+              <td>Consentimentos informais sem rastreabilidade auditável</td>
+              <td class="col-castlink">Termos de uso digitalizados com carimbo de data/hora e conformidade RGPD</td>
+            </tr>
+            <tr>
+              <td><strong>Consolidação de Resultados</strong></td>
+              <td>Horas de digitação manual após o término das audições</td>
+              <td class="col-castlink">Relatórios executivos e line-up de passarela em tempo real</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Formulário Inline de Demonstração VIP -->
+    <section id="demonstracao" class="section-wrapper">
+      <div class="demo-section-grid">
+        <div class="demo-info">
+          <span class="section-kicker">Implantação Corporativa</span>
+          <h2 class="section-title">Agende uma Demonstração VIP para o seu Próximo Evento</h2>
+          <p class="hero-desc">
+            Descubra como a CastLink pode ser configurada sob medida para a sua semana de moda, campanha publicitária ou produtora audiovisual.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Apresentação executiva personalizada em até 48 horas</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Ambiente dedicado de homologação para testes com a sua equipa</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Suporte técnico prioritário para produções ao vivo</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✉️</span>
+              <span>Canal institucional de referência: <strong>castlink.agency@gmail.com</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-form-box">
+          <h3 class="form-title">Solicitar Acesso / Demo VIP</h3>
+          <p class="form-subtitle">Preencha os dados abaixo para receber as credenciais de demonstração.</p>
+          
+          <form onsubmit="event.preventDefault(); alert('Solicitação registrada com sucesso no ambiente conceitual da CastLink. Em produção real, nossa equipe entrará em contato via e-mail institucional.');">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-nome">Nome Completo *</label>
+                <input type="text" id="demo-nome" class="form-control" placeholder="Seu nome" required autocomplete="name">
+              </div>
+              <div class="form-group">
+                <label for="demo-cargo">Cargo / Função *</label>
+                <input type="text" id="demo-cargo" class="form-control" placeholder="Ex: Diretor de Casting, Produtor" required autocomplete="organization-title">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-empresa">Empresa / Produtora / Agência *</label>
+                <input type="text" id="demo-empresa" class="form-control" placeholder="Nome da organização" required autocomplete="organization">
+              </div>
+              <div class="form-group">
+                <label for="demo-email">E-mail Corporativo *</label>
+                <input type="email" id="demo-email" class="form-control" placeholder="seuemail@empresa.com" required autocomplete="email">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-tipo">Tipo de Produção *</label>
+                <select id="demo-tipo" class="form-control" required>
+                  <option value="" disabled selected>Selecione a categoria</option>
+                  <option value="moda">Semana de Moda / Desfile</option>
+                  <option value="publicidade">Campanha Publicitária / Comercial</option>
+                  <option value="audiovisual">Cinema / Televisão / Streaming</option>
+                  <option value="eventos">Evento Corporativo / Feira</option>
+                  <option value="agencia">Gestão Contínua de Agência de Modelos</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="demo-volume">Volume Estimado de Participantes</label>
+                <select id="demo-volume" class="form-control">
+                  <option value="ate-50">Até 50 participantes</option>
+                  <option value="50-200">50 a 200 participantes</option>
+                  <option value="200-500">200 a 500 participantes</option>
+                  <option value="500+">Mais de 500 participantes</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="demo-mensagem">Detalhes do Evento ou Necessidades Específicas</label>
+              <textarea id="demo-mensagem" class="form-control" rows="3" placeholder="Conte-nos brevemente sobre a data prevista, formato do casting ou requisitos particulares..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-form-submit">
+              Agendar Demonstração VIP Exclusiva
+            </button>
+            
+            <p class="form-footer-note">
+              🔒 Seus dados são processados sob rigoroso sigilo profissional e conformidade RGPD.
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé Institucional Corporativo -->
+  <footer class="footer-main" role="contentinfo">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div>
+          <div class="brand-wrapper" style="margin-bottom: 12px;">
+            <div class="brand-icon" style="width: 36px; height: 36px; font-size: 1rem;">CL</div>
+            <div class="brand-text">
+              <span class="brand-title" style="font-size: 1.3rem;">CastLink</span>
+              <span class="brand-subtitle" style="font-size: 0.6rem;">Casting Management</span>
+            </div>
+          </div>
+          <p class="footer-col-desc">
+            Infraestrutura digital corporativa para gestão integrada de castings na moda, publicidade e entretenimento internacional.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Ecossistema</h4>
+          <ul class="footer-nav">
+            <li><a href="#solucao">Arquitetura de Segurança</a></li>
+            <li><a href="#metodologia">Metodologia 4 Etapas</a></li>
+            <li><a href="#cplp-case">CPLP Fashion Week</a></li>
+            <li><a href="#comparativo">Comparativo Enterprise</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Perfis de Acesso</h4>
+          <ul class="footer-nav">
+            <li><a href="#demonstracao">Direção de Casting</a></li>
+            <li><a href="#demonstracao">Estilistas & Júri</a></li>
+            <li><a href="#demonstracao">Agências de Modelos</a></li>
+            <li><a href="#demonstracao">Modelos & Talentos</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Contato & Conformidade</h4>
+          <ul class="footer-nav">
+            <li><a href="mailto:castlink.agency@gmail.com">castlink.agency@gmail.com</a></li>
+            <li><a href="https://castlink.world" target="_blank" rel="noopener">Website Oficial</a></li>
+            <li><a href="#demonstracao">Conformidade RGPD / LGPD</a></li>
+            <li><a href="#demonstracao">Segurança Supabase & R2</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          &copy; 2026 CastLink Platform. Todos os direitos reservados.
+        </div>
+        <div style="font-size: 0.72rem; color: #8a919f; max-width: 650px; text-align: right;">
+          ⚖️ <strong>GOVERNANÇA GARIMPO SITES:</strong> Protótipo visual concebido pelo agente <strong>Esboços sites</strong> para <strong>CastLink</strong> (castlink.world). A publicação de preview via GitHub Pages é uma prévia técnica de teste para avaliação humana. Não constitui aprovação comercial nem autoriza contato externo com clientes. Aprovação exclusiva de <strong>Paulo Nunes</strong>.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Barra Fixa Mobile para Conversão Rápida -->
+  <div class="mobile-action-bar" aria-label="Ações Rápidas Mobile">
+    <div class="inner">
+      <a href="#demonstracao" class="btn-mobile-demo">⚡ Solicitar Demo VIP</a>
+      <a href="castlink-world-v1-standalone.html" download="castlink-world-v1-standalone.html"  class="btn-mobile-dl">📥 Baixar</a>
+    </div>
+  </div>
+  
+</body>
+</html>
