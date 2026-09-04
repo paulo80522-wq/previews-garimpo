@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CastLink — Plataforma Profissional de Gestão de Castings | Standalone V1 Offline</title>
+  <meta name="description" content="Versão autônoma e autocontida do protótipo conceitual CastLink World com folhas de estilo embutidas.">
+  <style>
+/* ==========================================================================
+   CASTLINK WORLD — PROTÓTIPO VISUAL REDESIGN (GARIMPO SITES)
+   Estética: Haute Couture & Film Tech (Dark Obsidian, Champagne Gold, Glassmorphism)
+   Totalmente Responsivo (Desktop, Tablet e Mobile-First)
+   0 dependências locais. Sanitizado para publicação pública.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-main: #0a0b0e;
+  --bg-card: rgba(18, 20, 26, 0.85);
+  --bg-card-hover: rgba(26, 29, 38, 0.95);
+  --bg-surface: #12141a;
+  --border-glass: rgba(212, 175, 55, 0.2);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-focus: #d4af37;
+  
+  --gold-primary: #d4af37;
+  --gold-light: #f3e8c8;
+  --gold-dark: #aa8421;
+  --gold-gradient: linear-gradient(135deg, #f3e8c8 0%, #d4af37 50%, #aa8421 100%);
+  
+  --text-main: #f5f5f7;
+  --text-muted: #9ba1ad;
+  --text-dim: #646a77;
+  
+  --accent-emerald: #10b981;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  --shadow-gold: 0 10px 30px -10px rgba(212, 175, 55, 0.25);
+  --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.15);
+  
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  
+  --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.07) 0%, transparent 60%),
+              radial-gradient(circle at 90% 40%, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
+              var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  padding-bottom: 70px;
+}
+
+/* BARRA DE CONTROLE GARIMPO SITES */
+.control-bar {
+  background: #11141a;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 10px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  font-size: 0.82rem;
+  backdrop-filter: blur(12px);
+}
+
+.control-bar .left-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-light);
+  border: 1px solid var(--gold-primary);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background-color: var(--gold-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--gold-primary);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.project-meta {
+  color: var(--text-muted);
+}
+
+.control-bar .actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-ctrl {
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.78rem;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-ctrl-preview {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-ctrl-preview:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.btn-ctrl-download {
+  background: var(--gold-gradient);
+  color: #0d0e12;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.3);
+}
+
+.btn-ctrl-download:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* HEADER & NAVBAR */
+.header-main {
+  background: rgba(10, 11, 14, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 900;
+}
+
+.nav-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.brand-icon {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05));
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold-primary);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.brand-subtitle {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--gold-primary);
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition);
+  position: relative;
+}
+
+.nav-links a:hover {
+  color: var(--gold-light);
+}
+
+.nav-links a:hover::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gold-primary);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-nav-auth {
+  text-decoration: none;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.btn-nav-auth:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-nav-cta {
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--gold-gradient);
+  color: #0b0c10;
+  padding: 9px 20px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+}
+
+.btn-nav-cta:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* HERO SECTION */
+.hero-section {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 70px 24px 80px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero-pill-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid var(--border-glass);
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+
+.pill-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gold-light);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.12;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.hero-title em {
+  font-style: italic;
+  font-weight: 400;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-desc {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 580px;
+}
+
+.hero-cta-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.btn-hero-primary {
+  text-decoration: none;
+  background: var(--gold-gradient);
+  color: #0b0c10;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 15px 32px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+  transition: var(--transition);
+}
+
+.btn-hero-primary:hover {
+  filter: brightness(1.12);
+  transform: translateY(-2px);
+}
+
+.btn-hero-secondary {
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 15px 28px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.btn-hero-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hero-trust-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  margin-top: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trust-icon {
+  color: var(--gold-primary);
+}
+
+/* HERO MOCKUP CARD */
+.hero-visual-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+}
+
+.hero-visual-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gold-gradient);
+}
+
+.mockup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+}
+
+.mockup-tag {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.mockup-status-live {
+  font-size: 0.75rem;
+  color: var(--accent-emerald);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.mockup-status-live::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--accent-emerald);
+  border-radius: 50%;
+  animation: pulse-green 1.8s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.8); opacity: 0.4; }
+}
+
+.mockup-talent-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.talent-photo-box {
+  width: 120px;
+  height: 155px;
+  border-radius: var(--radius-sm);
+  background: #1a1d26;
+  border: 1px solid var(--border-glass);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.talent-avatar-silhouette {
+  font-size: 2.8rem;
+  line-height: 1;
+  color: var(--gold-primary);
+}
+
+.talent-photo-badge {
+  position: absolute;
+  bottom: 6px;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  background: rgba(10, 11, 14, 0.85);
+  color: var(--gold-light);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.talent-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.talent-meta-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.talent-name {
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.talent-code {
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.talent-agency {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.talent-measurements-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.measure-item {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.measure-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.measure-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+.mockup-actions-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.btn-mock-action {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.btn-mock-approve {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-mock-approve:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.btn-mock-fitting {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-light);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.btn-mock-fitting:hover {
+  background: rgba(212, 175, 55, 0.25);
+}
+
+/* FAIXA DE NÚMEROS */
+.strip-numbers {
+  background: #0f1116;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 36px 24px;
+}
+
+.strip-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px;
+}
+
+.stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 2px solid var(--gold-primary);
+  padding-left: 18px;
+}
+
+.stat-number {
+  font-family: var(--font-serif);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.stat-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* SEÇÃO GERAL */
+.section-wrapper {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 90px 24px;
+}
+
+.section-header-center {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.section-kicker {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: var(--gold-primary);
+}
+
+.section-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 3.5vw, 2.8rem);
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.section-subtitle {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+.pillar-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 36px 28px;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+.pillar-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--border-glass);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-card-hover);
+}
+
+.pillar-icon {
+  width: 52px;
+  height: 52px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: var(--gold-primary);
+}
+
+.pillar-title {
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.pillar-text {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* SEÇÃO WORKFLOW */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 30px 22px;
+  position: relative;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.step-card:hover {
+  border-color: var(--border-glass);
+  transform: translateY(-4px);
+}
+
+.step-number {
+  font-family: var(--font-serif);
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: var(--gold-primary);
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.step-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+}
+
+.step-text {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.step-tag {
+  font-size: 0.7rem;
+  color: var(--gold-light);
+  background: rgba(212, 175, 55, 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: fit-content;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  margin-top: auto;
+}
+
+/* SEÇÃO CASE CPLP */
+.case-feature {
+  background: linear-gradient(135deg, rgba(26, 29, 38, 0.9) 0%, rgba(15, 17, 23, 0.95) 100%);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 48px;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 40px;
+  align-items: center;
+  box-shadow: var(--shadow-card);
+}
+
+.case-badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--gold-primary);
+  font-weight: 700;
+}
+
+.case-title {
+  font-family: var(--font-serif);
+  font-size: 2.3rem;
+  color: #ffffff;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 10px;
+}
+
+.case-desc {
+  font-size: 0.98rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-top: 16px;
+}
+
+.case-metrics-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.case-metric-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  padding: 16px;
+  border-radius: var(--radius-sm);
+}
+
+.case-metric-val {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--gold-light);
+}
+
+.case-metric-lbl {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.case-quote-card {
+  background: rgba(10, 11, 14, 0.75);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-glow);
+}
+
+.quote-mark {
+  font-family: var(--font-serif);
+  font-size: 3rem;
+  color: var(--gold-primary);
+  line-height: 1;
+}
+
+.quote-text {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.18rem;
+  color: var(--text-main);
+  line-height: 1.6;
+}
+
+.quote-author {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold-light);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px;
+}
+
+/* SEÇÃO COMPARATIVO */
+.table-responsive {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.comparison-table th, 
+.comparison-table td {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.comparison-table th {
+  background: #11141c;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.comparison-table th.col-castlink {
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.08);
+  border-left: 1px solid var(--border-glass);
+  border-right: 1px solid var(--border-glass);
+}
+
+.comparison-table td.col-castlink {
+  background: rgba(212, 175, 55, 0.03);
+  font-weight: 600;
+  color: var(--gold-light);
+  border-left: 1px solid var(--border-glass);
+  border-right: 1px solid var(--border-glass);
+}
+
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* SEÇÃO DEMONSTRAÇÃO VIP */
+.demo-section-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.demo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.demo-form-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 36px;
+  box-shadow: var(--shadow-card);
+}
+
+.form-title {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.form-subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.form-control {
+  background: rgba(10, 11, 14, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  transition: var(--transition);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.form-control::placeholder {
+  color: var(--text-dim);
+}
+
+.btn-form-submit {
+  width: 100%;
+  background: var(--gold-gradient);
+  color: #0d0e12;
+  border: none;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+  margin-top: 8px;
+}
+
+.btn-form-submit:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.form-footer-note {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 14px;
+}
+
+/* FOOTER */
+.footer-main {
+  background: #07080b;
+  border-top: 1px solid var(--border-subtle);
+  padding: 60px 24px 30px;
+}
+
+.footer-container {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.footer-col-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 320px;
+  margin-top: 14px;
+}
+
+.footer-col-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--gold-light);
+  margin-bottom: 18px;
+}
+
+.footer-nav {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-nav a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  transition: var(--transition);
+}
+
+.footer-nav a:hover {
+  color: var(--gold-primary);
+}
+
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* MOBILE ACTION BAR */
+.mobile-action-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(10, 11, 14, 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-glass);
+  padding: 10px 18px;
+  z-index: 1000;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-action-bar .inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.btn-mobile-demo {
+  flex: 1;
+  background: var(--gold-gradient);
+  color: #0b0c10;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-mobile-dl {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* MEDIA QUERIES */
+@media (max-width: 1024px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .pillars-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .steps-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .strip-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .case-feature {
+    grid-template-columns: 1fr;
+  }
+  .demo-section-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-top {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .control-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .control-bar .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .nav-links {
+    display: none;
+  }
+  .pillars-grid,
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+  .strip-container {
+    grid-template-columns: 1fr;
+  }
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .footer-top {
+    grid-template-columns: 1fr;
+  }
+  .mobile-action-bar {
+    display: block;
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Controle Garimpo Sites -->
+  <aside class="control-bar" aria-label="Controle de Prévia Garimpo Sites">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — READY FOR PREVIEW</span>
+      <span class="project-meta">Projeto: <strong>CastLink World</strong> | Versão: <strong>v1</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#demonstracao" class="btn-ctrl btn-ctrl-preview" title="Ir para formulário de demonstração">👁️ VER DEMONSTRAÇÃO</a>
+      <a href="#"  onclick="alert('Você já está visualizando o protótipo autônomo offline completo com todos os estilos embutidos.'); return false;" class="btn-ctrl btn-ctrl-download" title="Baixar protótipo autônomo offline">📥 BAIXAR PROTÓTIPO</a>
+    </div>
+  </aside>
+
+  <!-- Cabeçalho Institucional Luxury -->
+  <header class="header-main" role="banner">
+    <div class="nav-container">
+      <a href="#" class="brand-wrapper" aria-label="CastLink World Início">
+        <div class="brand-icon">CL</div>
+        <div class="brand-text">
+          <span class="brand-title">CastLink</span>
+          <span class="brand-subtitle">Casting Management Platform</span>
+        </div>
+      </a>
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="#solucao">Solução</a>
+        <a href="#metodologia">4 Etapas</a>
+        <a href="#cplp-case">CPLP Fashion Week</a>
+        <a href="#comparativo">Comparativo</a>
+        <a href="#demonstracao">Demonstração VIP</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="#demonstracao" class="btn-nav-auth">Acesso Restrito</a>
+        <a href="#demonstracao" class="btn-nav-cta">Solicitar Demo</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo-principal">
+    <!-- Hero Section Editorial -->
+    <section class="hero-section" aria-labelledby="hero-heading">
+      <div class="hero-content">
+        <div class="hero-pill-box">
+          <span class="pill-text">Alta Tecnologia para Produções de Elite</span>
+        </div>
+        <h1 id="hero-heading" class="hero-title">
+          A Nova Era da Gestão de Casting <em>em Alta Definição</em>
+        </h1>
+        <p class="hero-desc">
+          Substitua planilhas desorganizadas, links expirados e e-mails dispersos por uma infraestrutura centralizada e segura. Do registo de agências à votação privada de estilistas em tempo real.
+        </p>
+        <div class="hero-cta-group">
+          <a href="#demonstracao" class="btn-hero-primary">
+            <span>Solicitar Demonstração VIP</span>
+            <span>→</span>
+          </a>
+          <a href="#metodologia" class="btn-hero-secondary">
+            <span>Conhecer o Fluxo Operacional</span>
+          </a>
+        </div>
+        <div class="hero-trust-badges">
+          <div class="trust-item">
+            <span class="trust-icon">✓</span>
+            <span>5 Níveis de Acesso Segregados</span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon">🔒</span>
+            <span>Armazenamento Privado Cloudflare R2 / S3</span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon">🛡️</span>
+            <span>Conformidade Estrita RGPD & LGPD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mockup Card Interativo da Ficha do Talento -->
+      <div class="hero-visual-card" aria-label="Mockup da Ficha de Talento">
+        <div class="mockup-header">
+          <span class="mockup-tag">Casting Operacional • Painel Direção</span>
+          <span class="mockup-status-live">Sessão Ativa</span>
+        </div>
+        <div class="mockup-talent-row">
+          <div class="talent-photo-box">
+            <div class="talent-avatar-silhouette">👤</div>
+            <span class="talent-photo-badge">Comp. HD</span>
+          </div>
+          <div class="talent-details">
+            <div class="talent-meta-top">
+              <span class="talent-name">Aura Matos</span>
+              <span class="talent-code">#TAL-8024</span>
+            </div>
+            <span class="talent-agency">Agência: [AGÊNCIA A CONFIRMAR]</span>
+            <div class="talent-measurements-grid">
+              <div class="measure-item">
+                <span class="measure-label">Altura</span>
+                <span class="measure-val">1.79 m</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Busto</span>
+                <span class="measure-val">84 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Cintura</span>
+                <span class="measure-val">60 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Quadril</span>
+                <span class="measure-val">89 cm</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Calçado</span>
+                <span class="measure-val">38 EU</span>
+              </div>
+              <div class="measure-item">
+                <span class="measure-label">Olhos</span>
+                <span class="measure-val">Castanhos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-actions-bar">
+          <button type="button" class="btn-mock-action btn-mock-approve" onclick="this.innerHTML = '✓ Aprovado para Runway'; this.style.borderColor='#10b981';">
+            <span>✓</span> Selecionar para Passarela
+          </button>
+          <button type="button" class="btn-mock-action btn-mock-fitting" onclick="this.innerHTML = '🕒 Agendado para Fitting'; this.style.borderColor='#d4af37';">
+            <span>🕒</span> Convocar Fitting
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Faixa de Métricas e Indicadores -->
+    <section class="strip-numbers" aria-label="Indicadores da Plataforma">
+      <div class="strip-container">
+        <div class="stat-box">
+          <span class="stat-number">4 Etapas</span>
+          <span class="stat-desc">Fluxo operacional padronizado de ponta a ponta</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">5 Papéis</span>
+          <span class="stat-desc">Perfis segregados com permissões granulares</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">100%</span>
+          <span class="stat-desc">URLs temporárias com criptografia em repouso</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-number">RGPD</span>
+          <span class="stat-desc">Consentimento digital auditável e proteção de imagem</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pilares de Solução (3 Colunas) -->
+    <section id="solucao" class="section-wrapper">
+      <div class="section-header-center">
+        <span class="section-kicker">Arquitetura de Segurança & Controle</span>
+        <h2 class="section-title">Construído para a Exigência das Grandes Produções</h2>
+        <p class="section-subtitle">
+          Moda, publicidade, televisão, cinema e eventos corporativos demandam sigilo absoluto, agilidade operacional e rigor métrico.
+        </p>
+      </div>
+      <div class="pillars-grid">
+        <article class="pillar-card">
+          <div class="pillar-icon">🔒</div>
+          <h3 class="pillar-title">Permissões Segregadas</h3>
+          <p class="pillar-text">
+            Cinco perfis especializados: Administração, Direção de Casting, Estilistas Convidados, Agências e Modelos. Cada interveniente visualiza estritamente os dados e ferramentas autorizados para a sua função.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <div class="pillar-icon">⚡</div>
+          <h3 class="pillar-title">Storage Privado com Presigned URLs</h3>
+          <p class="pillar-text">
+            Fotos de polaroides, composites em alta resolução e vídeos de passarela nunca ficam expostos em links públicos. Acesso sob tokens temporários com autenticação multifator (MFA) via Supabase e Cloudflare R2 / S3.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <div class="pillar-icon">⚖️</div>
+          <h3 class="pillar-title">Conformidade RGPD & LGPD</h3>
+          <p class="pillar-text">
+            Termos de uso de imagem, direitos conexos e consentimentos digitais registrados e auditáveis em tempo real, eliminando riscos e passivos jurídicos para produtoras e marcas contratantes.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Metodologia: Workflow de 4 Etapas -->
+    <section id="metodologia" class="section-wrapper" style="background: rgba(14, 16, 22, 0.4); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+      <div class="section-header-center">
+        <span class="section-kicker">Metodologia Homologada</span>
+        <h2 class="section-title">O Fluxo Operacional em 4 Etapas</h2>
+        <p class="section-subtitle">
+          Uma jornada contínua que substitui dezenas de trocas de mensagens dispersas por um ecossistema sincronizado.
+        </p>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <span class="step-number">01</span>
+          <h3 class="step-title">Configurar Evento</h3>
+          <p class="step-text">
+            Definição do briefing, categorias de casting (passarela, comercial, editorial), prazos e vinculação segura dos estilistas convidados.
+          </p>
+          <span class="step-tag">Briefing & Estruturação</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">02</span>
+          <h3 class="step-title">Registar Participantes</h3>
+          <p class="step-text">
+            Submissão padronizada por agências credenciadas ou candidaturas diretas com fichas técnicas de medidas e composite obrigatório.
+          </p>
+          <span class="step-tag">Ingestão Padronizada</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">03</span>
+          <h3 class="step-title">Pré-Casting & Fitting</h3>
+          <p class="step-text">
+            Triagem operacional em tempo real, notas confidenciais de júri, agendamento de provas de vestuário e conferência física de medidas.
+          </p>
+          <span class="step-tag">Operação em Pista</span>
+        </div>
+        <div class="step-card">
+          <span class="step-number">04</span>
+          <h3 class="step-title">Seleção & Relatórios</h3>
+          <p class="step-text">
+            Geração instantânea de relatórios executivos finais, exportação de line-ups para backstage e formalização contratual dos selecionados.
+          </p>
+          <span class="step-tag">Decisão Executiva</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Estudo de Caso de Referência: CPLP Fashion Week -->
+    <section id="cplp-case" class="section-wrapper">
+      <div class="case-feature">
+        <div>
+          <span class="case-badge">Produção de Referência</span>
+          <h2 class="case-title">CPLP Fashion Week</h2>
+          <p class="case-desc">
+            Na 4ª edição em Lisboa (maio de 2026), a CPLP Fashion Week utilizou a infraestrutura CastLink para orquestrar o processo de seleção internacional de modelos entre múltiplos países lusófonos, estilistas e agências parceiras com zero atrito de comunicação.
+          </p>
+          <div class="case-metrics-list">
+            <div class="case-metric-box">
+              <span class="case-metric-val">4ª Edição</span>
+              <span class="case-metric-lbl">Lisboa, Portugal (Maio 2026)</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">100% Digital</span>
+              <span class="case-metric-lbl">Fichas técnicas e votação em tempo real</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">Multipaíses</span>
+              <span class="case-metric-lbl">Modelos e agências de toda a CPLP</span>
+            </div>
+            <div class="case-metric-box">
+              <span class="case-metric-val">Zero Planilhas</span>
+              <span class="case-metric-lbl">Backstage totalmente integrado</span>
+            </div>
+          </div>
+        </div>
+        <div class="case-quote-card">
+          <span class="quote-mark">“</span>
+          <p class="quote-text">
+            A CastLink elevou a curadoria e a seleção da CPLP Fashion Week ao mais rigoroso patamar internacional. A agilidade nas medições e a confidencialidade das escolhas dos estilistas foram decisivas para o sucesso do evento.
+          </p>
+          <span class="quote-author">Produção Executiva — CPLP Fashion Week Lisboa</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela Comparativa de Recursos -->
+    <section id="comparativo" class="section-wrapper" style="background: rgba(14, 16, 22, 0.4); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+      <div class="section-header-center">
+        <span class="section-kicker">Eficiência Comprovada</span>
+        <h2 class="section-title">Planilhas & Grupos de WhatsApp vs. CastLink</h2>
+        <p class="section-subtitle">
+          Veja por que grandes produtoras e semanas de moda abandonaram métodos improvisados em favor de uma plataforma dedicada.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 35%;">Critério Operacional</th>
+              <th scope="col" style="width: 32%;">Processo Tradicional (Planilhas & WhatsApp)</th>
+              <th scope="col" class="col-castlink" style="width: 33%;">Plataforma CastLink Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Armazenamento de Fotos e Vídeos</strong></td>
+              <td>Links expirados do WeTransfer/Drive dispersos em mensagens</td>
+              <td class="col-castlink">Storage R2/S3 com URLs temporárias e criptografia nativa</td>
+            </tr>
+            <tr>
+              <td><strong>Privacidade e Separação de Acessos</strong></td>
+              <td>Todos veem tudo; risco constante de vazamento de dados e cachês</td>
+              <td class="col-castlink">5 níveis de permissão: estilista só vota, agência só gere seus modelos</td>
+            </tr>
+            <tr>
+              <td><strong>Padronização de Medidas</strong></td>
+              <td>Formatos arbitrários em conversas sem validação técnica</td>
+              <td class="col-castlink">Ficha técnica padronizada (altura, busto, cintura, quadril, calçado)</td>
+            </tr>
+            <tr>
+              <td><strong>Segurança Jurídica & RGPD</strong></td>
+              <td>Consentimentos informais sem rastreabilidade auditável</td>
+              <td class="col-castlink">Termos de uso digitalizados com carimbo de data/hora e conformidade RGPD</td>
+            </tr>
+            <tr>
+              <td><strong>Consolidação de Resultados</strong></td>
+              <td>Horas de digitação manual após o término das audições</td>
+              <td class="col-castlink">Relatórios executivos e line-up de passarela em tempo real</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Formulário Inline de Demonstração VIP -->
+    <section id="demonstracao" class="section-wrapper">
+      <div class="demo-section-grid">
+        <div class="demo-info">
+          <span class="section-kicker">Implantação Corporativa</span>
+          <h2 class="section-title">Agende uma Demonstração VIP para o seu Próximo Evento</h2>
+          <p class="hero-desc">
+            Descubra como a CastLink pode ser configurada sob medida para a sua semana de moda, campanha publicitária ou produtora audiovisual.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Apresentação executiva personalizada em até 48 horas</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Ambiente dedicado de homologação para testes com a sua equipa</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✓</span>
+              <span>Suporte técnico prioritário para produções ao vivo</span>
+            </div>
+            <div class="trust-item">
+              <span class="trust-icon">✉️</span>
+              <span>Canal institucional de referência: <strong>castlink.agency@gmail.com</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-form-box">
+          <h3 class="form-title">Solicitar Acesso / Demo VIP</h3>
+          <p class="form-subtitle">Preencha os dados abaixo para receber as credenciais de demonstração.</p>
+          
+          <form onsubmit="event.preventDefault(); alert('Solicitação registrada com sucesso no ambiente conceitual da CastLink. Em produção real, nossa equipe entrará em contato via e-mail institucional.');">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-nome">Nome Completo *</label>
+                <input type="text" id="demo-nome" class="form-control" placeholder="Seu nome" required autocomplete="name">
+              </div>
+              <div class="form-group">
+                <label for="demo-cargo">Cargo / Função *</label>
+                <input type="text" id="demo-cargo" class="form-control" placeholder="Ex: Diretor de Casting, Produtor" required autocomplete="organization-title">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-empresa">Empresa / Produtora / Agência *</label>
+                <input type="text" id="demo-empresa" class="form-control" placeholder="Nome da organização" required autocomplete="organization">
+              </div>
+              <div class="form-group">
+                <label for="demo-email">E-mail Corporativo *</label>
+                <input type="email" id="demo-email" class="form-control" placeholder="seuemail@empresa.com" required autocomplete="email">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="demo-tipo">Tipo de Produção *</label>
+                <select id="demo-tipo" class="form-control" required>
+                  <option value="" disabled selected>Selecione a categoria</option>
+                  <option value="moda">Semana de Moda / Desfile</option>
+                  <option value="publicidade">Campanha Publicitária / Comercial</option>
+                  <option value="audiovisual">Cinema / Televisão / Streaming</option>
+                  <option value="eventos">Evento Corporativo / Feira</option>
+                  <option value="agencia">Gestão Contínua de Agência de Modelos</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="demo-volume">Volume Estimado de Participantes</label>
+                <select id="demo-volume" class="form-control">
+                  <option value="ate-50">Até 50 participantes</option>
+                  <option value="50-200">50 a 200 participantes</option>
+                  <option value="200-500">200 a 500 participantes</option>
+                  <option value="500+">Mais de 500 participantes</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="demo-mensagem">Detalhes do Evento ou Necessidades Específicas</label>
+              <textarea id="demo-mensagem" class="form-control" rows="3" placeholder="Conte-nos brevemente sobre a data prevista, formato do casting ou requisitos particulares..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-form-submit">
+              Agendar Demonstração VIP Exclusiva
+            </button>
+            
+            <p class="form-footer-note">
+              🔒 Seus dados são processados sob rigoroso sigilo profissional e conformidade RGPD.
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé Institucional Corporativo -->
+  <footer class="footer-main" role="contentinfo">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div>
+          <div class="brand-wrapper" style="margin-bottom: 12px;">
+            <div class="brand-icon" style="width: 36px; height: 36px; font-size: 1rem;">CL</div>
+            <div class="brand-text">
+              <span class="brand-title" style="font-size: 1.3rem;">CastLink</span>
+              <span class="brand-subtitle" style="font-size: 0.6rem;">Casting Management</span>
+            </div>
+          </div>
+          <p class="footer-col-desc">
+            Infraestrutura digital corporativa para gestão integrada de castings na moda, publicidade e entretenimento internacional.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Ecossistema</h4>
+          <ul class="footer-nav">
+            <li><a href="#solucao">Arquitetura de Segurança</a></li>
+            <li><a href="#metodologia">Metodologia 4 Etapas</a></li>
+            <li><a href="#cplp-case">CPLP Fashion Week</a></li>
+            <li><a href="#comparativo">Comparativo Enterprise</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Perfis de Acesso</h4>
+          <ul class="footer-nav">
+            <li><a href="#demonstracao">Direção de Casting</a></li>
+            <li><a href="#demonstracao">Estilistas & Júri</a></li>
+            <li><a href="#demonstracao">Agências de Modelos</a></li>
+            <li><a href="#demonstracao">Modelos & Talentos</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Contato & Conformidade</h4>
+          <ul class="footer-nav">
+            <li><a href="mailto:castlink.agency@gmail.com">castlink.agency@gmail.com</a></li>
+            <li><a href="https://castlink.world" target="_blank" rel="noopener">Website Oficial</a></li>
+            <li><a href="#demonstracao">Conformidade RGPD / LGPD</a></li>
+            <li><a href="#demonstracao">Segurança Supabase & R2</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          &copy; 2026 CastLink Platform. Todos os direitos reservados.
+        </div>
+        <div style="font-size: 0.72rem; color: #8a919f; max-width: 650px; text-align: right;">
+          ⚖️ <strong>GOVERNANÇA GARIMPO SITES:</strong> Protótipo visual concebido pelo agente <strong>Esboços sites</strong> para <strong>CastLink</strong> (castlink.world). A publicação de preview via GitHub Pages é uma prévia técnica de teste para avaliação humana. Não constitui aprovação comercial nem autoriza contato externo com clientes. Aprovação exclusiva de <strong>Paulo Nunes</strong>.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Barra Fixa Mobile para Conversão Rápida -->
+  <div class="mobile-action-bar" aria-label="Ações Rápidas Mobile">
+    <div class="inner">
+      <a href="#demonstracao" class="btn-mobile-demo">⚡ Solicitar Demo VIP</a>
+      <a href="#"  onclick="alert('Você já está visualizando o protótipo autônomo offline completo com todos os estilos embutidos.'); return false;" class="btn-mobile-dl">📥 Baixar</a>
+    </div>
+  </div>
+  
+</body>
+</html>
