@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CastLink World — Haute Couture & Runway Casting | Standalone v2 Offline</title>
+  <meta name="description" content="Versão autônoma e autocontida do protótipo editorial CastLink World v2 com folhas de estilo de alta costura embutidas.">
+  <style>
+/* ==========================================================================
+   CASTLINK WORLD — REDESIGN DE ALTA COSTURA & FASHION WEEK (v2)
+   Estética: Luxury Editorial / Vogue Runway / Paris & Lisboa Fashion Week
+   Diretriz de Paulo Nunes: "site que pareça que está ligado realmente à moda e não um site igual aos outros"
+   Paleta: Noir Absolu (#060709), Marfim Nobre (#fbf9f5), Ouro Champagne (#dfc298 / #c5a880)
+   0 referências locais. 100% Sanitizado para publicação técnica externa.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=Italiana&family=Montserrat:wght@200;300;400;500;600;700&display=swap');
+
+:root {
+  --bg-deep: #060709;
+  --bg-surface: #0c0e12;
+  --bg-card: rgba(16, 18, 24, 0.88);
+  --bg-card-hover: rgba(24, 27, 36, 0.95);
+  --bg-glass: rgba(18, 20, 28, 0.7);
+  
+  --gold-primary: #dfc298;
+  --gold-light: #f5ebd9;
+  --gold-dark: #9e7d53;
+  --gold-antique: #c5a880;
+  --gold-gradient: linear-gradient(135deg, #f7ecd9 0%, #dfc298 40%, #a98251 100%);
+  --gold-border-gradient: linear-gradient(135deg, rgba(223, 194, 152, 0.6) 0%, rgba(169, 130, 81, 0.2) 100%);
+  
+  --text-primary: #fcfbfa;
+  --text-secondary: #c4c1bc;
+  --text-muted: #888682;
+  --text-dim: #5c5a56;
+  
+  --accent-emerald: #10b981;
+  --accent-ruby: #be123c;
+  
+  --border-gold-subtle: rgba(223, 194, 152, 0.2);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.14);
+  
+  --font-display: 'Italiana', 'Cinzel', Georgia, serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  --shadow-luxury: 0 20px 40px -15px rgba(0, 0, 0, 0.8), 0 0 30px rgba(223, 194, 152, 0.08);
+  --shadow-glow: 0 0 25px rgba(223, 194, 152, 0.15);
+  
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-full: 9999px;
+  
+  --transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: 
+    radial-gradient(circle at 50% 0%, rgba(223, 194, 152, 0.09) 0%, transparent 50%),
+    radial-gradient(circle at 10% 30%, rgba(197, 168, 128, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 90% 70%, rgba(223, 194, 152, 0.04) 0%, transparent 40%),
+    var(--bg-deep);
+  color: var(--text-primary);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  padding-bottom: 75px;
+}
+
+/* ==========================================================================
+   BARRA DE CONTROLE GARIMPO SITES (GOVERNANÇA & PRÉVIA TÉCNICA)
+   ========================================================================== */
+.control-bar {
+  background: rgba(10, 11, 15, 0.96);
+  border-bottom: 1px solid var(--border-gold-subtle);
+  padding: 10px 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  font-size: 0.8rem;
+  backdrop-filter: blur(16px);
+}
+
+.control-bar .left-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  background: rgba(223, 194, 152, 0.12);
+  color: var(--gold-light);
+  border: 1px solid var(--gold-primary);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background-color: var(--gold-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--gold-primary);
+  animation: pulse-gold 2s infinite;
+}
+
+@keyframes pulse-gold {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+.project-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.project-meta strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.control-bar .actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-ctrl {
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  padding: 7px 16px;
+  border-radius: var(--radius-xs);
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.btn-ctrl-preview {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-ctrl-preview:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-ctrl-download {
+  background: var(--gold-gradient);
+  color: #060709;
+  font-weight: 700;
+  border: 1px solid var(--gold-light);
+  box-shadow: 0 4px 14px rgba(223, 194, 152, 0.25);
+}
+
+.btn-ctrl-download:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   MASTHEAD EDITORIAL & NAVBAR DE ALTA COSTURA
+   ========================================================================== */
+.fashion-ticker {
+  background: #000000;
+  border-bottom: 1px solid rgba(223, 194, 152, 0.15);
+  padding: 6px 20px;
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-antique);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-fashion {
+  background: rgba(6, 7, 9, 0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-gold-subtle);
+  position: relative;
+  z-index: 1000;
+}
+
+.nav-container {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 22px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-wrapper {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: #ffffff;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.brand-subtitle {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  color: var(--gold-primary);
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transition: var(--transition);
+  position: relative;
+  padding: 4px 0;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 1px;
+  background: var(--gold-primary);
+  transition: var(--transition);
+}
+
+.nav-links a:hover {
+  color: #ffffff;
+}
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-editorial-outline {
+  text-decoration: none;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid var(--border-gold-subtle);
+  padding: 10px 22px;
+  border-radius: var(--radius-xs);
+  transition: var(--transition);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-editorial-outline:hover {
+  border-color: var(--gold-primary);
+  color: var(--gold-light);
+  background: rgba(223, 194, 152, 0.05);
+}
+
+.btn-editorial-gold {
+  text-decoration: none;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: var(--gold-gradient);
+  color: #060709;
+  padding: 10px 26px;
+  border-radius: var(--radius-xs);
+  transition: var(--transition);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(223, 194, 152, 0.2);
+}
+
+.btn-editorial-gold:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   HERO EDITORIAL — HAUTE COUTURE LOOKBOOK
+   ========================================================================== */
+.hero-editorial {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 80px 36px 90px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 60px;
+  align-items: center;
+  position: relative;
+}
+
+.hero-issue-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  border-bottom: 1px solid var(--gold-primary);
+  padding-bottom: 6px;
+  margin-bottom: 24px;
+}
+
+.hero-title-editorial {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 5.2vw, 4.6rem);
+  font-weight: 400;
+  line-height: 1.05;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.hero-title-editorial em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 300;
+  text-transform: none;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-lead {
+  font-family: var(--font-serif);
+  font-size: 1.28rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  font-weight: 400;
+  max-width: 640px;
+  margin-bottom: 36px;
+}
+
+.hero-actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.hero-provenance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  padding-top: 30px;
+  border-top: 1px solid var(--border-gold-subtle);
+}
+
+.prov-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.prov-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-antique);
+  font-weight: 600;
+}
+
+.prov-value {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-top: 3px;
+}
+
+/* ==========================================================================
+   MOCKUP INTERATIVO DE ALTA COSTURA: COMP CARD & FITTING ROOM
+   ========================================================================== */
+.comp-card-editorial {
+  background: linear-gradient(180deg, #10121a 0%, #0a0b0f 100%);
+  border: 1px solid var(--border-gold-subtle);
+  border-radius: var(--radius-sm);
+  padding: 30px;
+  box-shadow: var(--shadow-luxury);
+  position: relative;
+  overflow: hidden;
+}
+
+.comp-card-editorial::before {
+  content: 'CASTLINK COMPOSITE';
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  font-size: 0.58rem;
+  letter-spacing: 0.3em;
+  color: rgba(223, 194, 152, 0.4);
+  font-weight: 700;
+}
+
+.comp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
+  margin-bottom: 22px;
+}
+
+.comp-number {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  color: var(--gold-primary);
+}
+
+.comp-session-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-emerald);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.comp-session-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--accent-emerald);
+  border-radius: 50%;
+  animation: pulse-emerald 1.8s infinite;
+}
+
+@keyframes pulse-emerald {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.comp-main-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 24px;
+}
+
+.polaroid-frame {
+  background: #000000;
+  border: 1px solid rgba(223, 194, 152, 0.3);
+  padding: 8px 8px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+
+.polaroid-photo-aspect {
+  width: 100%;
+  height: 180px;
+  background: linear-gradient(135deg, #181b24 0%, #0d0f14 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.polaroid-silhouette {
+  font-size: 3.5rem;
+  color: var(--gold-antique);
+  line-height: 1;
+}
+
+.polaroid-caption {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.75rem;
+  color: var(--gold-light);
+  margin-top: 10px;
+  letter-spacing: 0.06em;
+}
+
+.comp-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comp-model-name {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 400;
+  color: #ffffff;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.comp-agency-tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.runway-measurements-table {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  padding: 12px;
+  margin-top: 6px;
+}
+
+.runway-meas-cell {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.runway-meas-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.runway-meas-val {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.comp-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.btn-comp-action {
+  flex: 1;
+  padding: 10px;
+  min-height: 44px;
+  border-radius: var(--radius-xs);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.btn-comp-runway {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.btn-comp-runway:hover {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #34d399;
+}
+
+.btn-comp-fitting {
+  background: rgba(223, 194, 152, 0.12);
+  color: var(--gold-light);
+  border: 1px solid var(--border-gold-subtle);
+}
+
+.btn-comp-fitting:hover {
+  background: rgba(223, 194, 152, 0.22);
+  border-color: var(--gold-primary);
+}
+
+/* ==========================================================================
+   FAIXA EDITORIAL CPLP FASHION WEEK (PROVA SOCIAL DE LUXO)
+   ========================================================================== */
+.strip-fashion-week {
+  background: linear-gradient(90deg, #050608 0%, #12141c 50%, #050608 100%);
+  border-top: 1px solid var(--border-gold-subtle);
+  border-bottom: 1px solid var(--border-gold-subtle);
+  padding: 40px 36px;
+  position: relative;
+}
+
+.strip-fw-container {
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.fw-headline-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.fw-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 700;
+}
+
+.fw-title {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.fw-stats-strip {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.fw-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.fw-stat-num {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  color: var(--gold-light);
+  line-height: 1;
+}
+
+.fw-stat-lbl {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   SEÇÕES GERAIS EDITORIAL FASHION
+   ========================================================================== */
+.section-editorial {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 100px 36px;
+}
+
+.section-head-fashion {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto 65px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.section-kicker-gold {
+  font-size: 0.72rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-kicker-gold::before,
+.section-kicker-gold::after {
+  content: '';
+  width: 30px;
+  height: 1px;
+  background: var(--gold-primary);
+  opacity: 0.5;
+}
+
+.section-title-fashion {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  font-weight: 400;
+  color: #ffffff;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-title-fashion em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  text-transform: none;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.section-desc-fashion {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* ==========================================================================
+   OS 4 ATOS DA PASSARELA (WORKFLOW EDITORIAL)
+   ========================================================================== */
+.acts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+}
+
+.act-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 34px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  transition: var(--transition);
+}
+
+.act-card:hover {
+  border-color: var(--border-gold-subtle);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-luxury);
+  background: var(--bg-card-hover);
+}
+
+.act-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.act-card:hover::before {
+  opacity: 1;
+}
+
+.act-num-roman {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: var(--gold-primary);
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.act-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: #ffffff;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.act-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.act-meta {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-antique);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   OS 5 PAPÉIS NO ATELIER (ARQUITETURA DE SEGURANÇA & SEGREGADA)
+   ========================================================================== */
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.role-card-fashion {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 32px 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: var(--transition);
+}
+
+.role-card-fashion:hover {
+  border-color: var(--gold-primary);
+  background: var(--bg-card-hover);
+  transform: translateY(-4px);
+}
+
+.role-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 700;
+}
+
+.role-title {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.role-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.roles-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+}
+
+/* ==========================================================================
+   ESTUDO DE CASO: CPLP FASHION WEEK LISBOA (EDITORIAL SPREAD)
+   ========================================================================== */
+.cplp-spread {
+  background: linear-gradient(135deg, #10121a 0%, #060709 100%);
+  border: 1px solid var(--border-gold-subtle);
+  border-radius: var(--radius-sm);
+  padding: 55px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 50px;
+  align-items: center;
+  box-shadow: var(--shadow-luxury);
+  position: relative;
+  overflow: hidden;
+}
+
+.cplp-spread::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--gold-gradient);
+}
+
+.cplp-tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  font-weight: 700;
+}
+
+.cplp-title {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+.cplp-text {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-top: 18px;
+}
+
+.cplp-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.cplp-m-card {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  padding: 18px 20px;
+  border-radius: var(--radius-xs);
+}
+
+.cplp-m-val {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--gold-light);
+  line-height: 1;
+}
+
+.cplp-m-lbl {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.cplp-quote-fashion {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border-gold-subtle);
+  padding: 36px 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.quote-dropcap {
+  font-family: var(--font-display);
+  font-size: 4rem;
+  color: var(--gold-primary);
+  line-height: 0.7;
+}
+
+.quote-fashion-body {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.quote-fashion-author {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  font-weight: 600;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+/* ==========================================================================
+   TABELA COMPARATIVA DE ALTA COSTURA: PLANILHAS VS. CASTLINK ATELIER
+   ========================================================================== */
+.table-luxury-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-gold-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-luxury);
+}
+
+.table-luxury {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table-luxury th,
+.table-luxury td {
+  padding: 22px 30px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.table-luxury th {
+  background: #090b0e;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.table-luxury th.col-castlink-luxe {
+  color: var(--gold-light);
+  background: rgba(223, 194, 152, 0.08);
+  border-left: 1px solid var(--border-gold-subtle);
+  border-right: 1px solid var(--border-gold-subtle);
+}
+
+.table-luxury td {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.table-luxury td.col-castlink-luxe {
+  background: rgba(223, 194, 152, 0.03);
+  color: var(--text-primary);
+  font-weight: 500;
+  border-left: 1px solid var(--border-gold-subtle);
+  border-right: 1px solid var(--border-gold-subtle);
+}
+
+.table-luxury tr:last-child td {
+  border-bottom: none;
+}
+
+/* ==========================================================================
+   FORMULÁRIO INLINE DEMO VIP ATELIER
+   ========================================================================== */
+.demo-atelier-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 60px;
+  align-items: center;
+}
+
+.atelier-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.atelier-features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.atelier-feat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.atelier-feat-icon {
+  color: var(--gold-primary);
+  font-size: 1rem;
+}
+
+.atelier-form-box {
+  background: linear-gradient(180deg, #10121a 0%, #08090d 100%);
+  border: 1px solid var(--border-gold-subtle);
+  border-radius: var(--radius-sm);
+  padding: 42px 36px;
+  box-shadow: var(--shadow-luxury);
+}
+
+.form-head-luxe {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.form-sub-luxe {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  margin-bottom: 26px;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.form-group-luxe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.form-group-luxe label {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  font-weight: 600;
+}
+
+.form-input-luxe {
+  background: rgba(6, 7, 9, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 13px 16px;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  transition: var(--transition);
+}
+
+.form-input-luxe:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 15px rgba(223, 194, 152, 0.25);
+  background: rgba(14, 16, 22, 0.95);
+}
+
+.form-input-luxe::placeholder {
+  color: var(--text-dim);
+}
+
+.btn-form-luxe {
+  width: 100%;
+  background: var(--gold-gradient);
+  color: #060709;
+  border: none;
+  padding: 16px;
+  border-radius: var(--radius-xs);
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 8px 25px rgba(223, 194, 152, 0.3);
+  margin-top: 10px;
+  min-height: 48px;
+}
+
+.btn-form-luxe:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.form-security-note {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* ==========================================================================
+   RODAPÉ EDITORIAL DE ALTA COSTURA
+   ========================================================================== */
+.footer-editorial {
+  background: #040507;
+  border-top: 1px solid var(--border-gold-subtle);
+  padding: 70px 36px 35px;
+}
+
+.footer-container {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.footer-columns-luxe {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, 1fr);
+  gap: 50px;
+  padding-bottom: 50px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.footer-brand-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: 0.18em;
+  color: #ffffff;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.footer-brand-sub {
+  font-size: 0.62rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+  margin-top: 6px;
+}
+
+.footer-brand-p {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 340px;
+  margin-top: 16px;
+}
+
+.footer-col-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin-bottom: 22px;
+}
+
+.footer-links-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-links-list a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  transition: var(--transition);
+}
+
+.footer-links-list a:hover {
+  color: var(--gold-primary);
+}
+
+.footer-bottom-luxe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 30px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer-governance-pill {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  max-width: 720px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+/* ==========================================================================
+   BARRA MÓVEL FLUTUANTE (MOBILE ACTION BAR)
+   ========================================================================== */
+.mobile-fashion-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(6, 7, 9, 0.96);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-gold-subtle);
+  padding: 10px 20px;
+  z-index: 1200;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.8);
+}
+
+.mobile-fashion-bar .inner-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-mob-demo {
+  flex: 1.2;
+  background: var(--gold-gradient);
+  color: #060709;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 12px;
+  border-radius: var(--radius-xs);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-mob-dl {
+  flex: 0.8;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 12px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* ==========================================================================
+   RESPONSIVIDADE (TABLET & SMARTPHONE)
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .hero-editorial {
+    grid-template-columns: 1fr;
+    gap: 50px;
+  }
+  .acts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .roles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cplp-spread {
+    grid-template-columns: 1fr;
+  }
+  .demo-atelier-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-columns-luxe {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .control-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .control-bar .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .nav-links {
+    display: none;
+  }
+  .acts-grid,
+  .roles-grid,
+  .roles-grid-bottom {
+    grid-template-columns: 1fr;
+  }
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+  .hero-provenance {
+    grid-template-columns: 1fr;
+  }
+  .cplp-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-columns-luxe {
+    grid-template-columns: 1fr;
+  }
+  .footer-governance-pill {
+    text-align: left;
+  }
+  .mobile-fashion-bar {
+    display: block;
+  }
+  .strip-fw-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Controle Garimpo Sites -->
+  <aside class="control-bar" aria-label="Controle de Prévia Garimpo Sites">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — READY FOR PREVIEW</span>
+      <span class="project-meta">Projeto: <strong>CastLink World (Haute Couture)</strong> | Versão: <strong>v2</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#atelier-demo" class="btn-ctrl btn-ctrl-preview" title="Ir para o formulário de demonstração VIP">👁️ VER DEMONSTRAÇÃO</a>
+      <a href="#"  onclick="alert('Você já está visualizando o protótipo autônomo offline completo (v2) com todos os estilos de alta costura embutidos.'); return false;" class="btn-ctrl btn-ctrl-download" title="Baixar protótipo autônomo offline">📥 BAIXAR PROTÓTIPO</a>
+    </div>
+  </aside>
+
+  <!-- Fashion Ticker / Paris • Milano • Lisboa • New York -->
+  <div class="fashion-ticker" aria-hidden="true">
+    <span>Official Partner • CPLP Fashion Week Lisboa (4ª Edição)</span>
+    <span>Runway & Editorial Casting Infrastructure</span>
+    <span>Milano • Paris • Lisboa • São Paulo • Luanda</span>
+  </div>
+
+  <!-- Masthead Editorial & Header de Alta Costura -->
+  <header class="header-fashion" role="banner">
+    <div class="nav-container">
+      <a href="#" class="brand-wrapper" aria-label="CastLink World Início">
+        <span class="brand-title">CASTLINK</span>
+        <span class="brand-subtitle">Haute Couture & Runway Casting Intelligence</span>
+      </a>
+      <nav class="nav-links" aria-label="Navegação Principal">
+        <a href="#atos">Os 4 Atos</a>
+        <a href="#papeis">Os 5 Perfis</a>
+        <a href="#cplp-fashion-week">CPLP Fashion Week</a>
+        <a href="#comparativo-atelier">Comparativo</a>
+        <a href="#atelier-demo">Atelier VIP</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="#atelier-demo" class="btn-editorial-outline">Acesso Restrito</a>
+        <a href="#atelier-demo" class="btn-editorial-gold">Solicitar Demo</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo-principal">
+    <!-- Hero Section: Lookbook Editorial -->
+    <section class="hero-editorial" aria-labelledby="hero-heading">
+      <div class="hero-text-col">
+        <div class="hero-issue-tag">
+          <span>Edição Internacional • Runway Curatorship</span>
+        </div>
+        <h1 id="hero-heading" class="hero-title-editorial">
+          A Passarela Começa nos Bastidores da <em>Curadoria</em>
+        </h1>
+        <p class="hero-lead">
+          A infraestrutura digital concebida para as semanas de moda, estilistas de alta costura e diretores de casting internacionais. Substitua o caos de planilhas dispersas pela precisão de um atelier digital seguro.
+        </p>
+        <div class="hero-actions-group">
+          <a href="#atelier-demo" class="btn-editorial-gold" style="padding: 14px 34px; font-size: 0.82rem;">
+            Agendar Demonstração Privada
+          </a>
+          <a href="#atos" class="btn-editorial-outline" style="padding: 14px 28px; font-size: 0.82rem;">
+            Explorar os 4 Atos
+          </a>
+        </div>
+        <div class="hero-provenance">
+          <div class="prov-item">
+            <span class="prov-label">Produção Oficial</span>
+            <span class="prov-value">CPLP Fashion Week</span>
+          </div>
+          <div class="prov-item">
+            <span class="prov-label">Segurança & RGPD</span>
+            <span class="prov-value">Criptografia R2 / S3</span>
+          </div>
+          <div class="prov-item">
+            <span class="prov-label">Perfis Segregados</span>
+            <span class="prov-value">5 Papéis Granulares</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mockup Interativo: Comp Card Digital de Alta Costura -->
+      <aside class="comp-card-editorial" aria-label="Comp Card Digital Interativo">
+        <div class="comp-header">
+          <div>
+            <span class="comp-number">COMPOSITE Nº 8024 / RUNWAY S26</span>
+          </div>
+          <div class="comp-session-badge">
+            Sessão de Pista Ativa
+          </div>
+        </div>
+
+        <div class="comp-main-grid">
+          <div class="polaroid-frame">
+            <div class="polaroid-photo-aspect">
+              <span class="polaroid-silhouette">👤</span>
+            </div>
+            <span class="polaroid-caption">Aura Matos • Lisboa</span>
+          </div>
+
+          <div class="comp-details">
+            <div>
+              <span class="comp-agency-tag">Agência: [AGÊNCIA A CONFIRMAR]</span>
+              <h3 class="comp-model-name">Aura Matos</h3>
+            </div>
+
+            <div class="runway-measurements-table">
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Altura</span>
+                <span class="runway-meas-val">1.79 m</span>
+              </div>
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Busto</span>
+                <span class="runway-meas-val">84 cm</span>
+              </div>
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Cintura</span>
+                <span class="runway-meas-val">60 cm</span>
+              </div>
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Quadril</span>
+                <span class="runway-meas-val">89 cm</span>
+              </div>
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Calçado</span>
+                <span class="runway-meas-val">38 EU</span>
+              </div>
+              <div class="runway-meas-cell">
+                <span class="runway-meas-label">Olhos</span>
+                <span class="runway-meas-val">Castanhos</span>
+              </div>
+            </div>
+
+            <p style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; margin-top: 4px;">
+              Polaroides em alta definição protegidas com URLs temporárias assinadas (Cloudflare R2).
+            </p>
+          </div>
+        </div>
+
+        <div class="comp-actions-row">
+          <button type="button" class="btn-comp-action btn-comp-runway" onclick="this.innerHTML = '✓ Selecionada para Passarela'; this.style.borderColor='#10b981';">
+            <span>✓</span> Selecionar para Passarela
+          </button>
+          <button type="button" class="btn-comp-action btn-comp-fitting" onclick="this.innerHTML = '🕒 Convocada para Fitting'; this.style.borderColor='#dfc298';">
+            <span>🕒</span> Convocar Fitting
+          </button>
+        </div>
+      </aside>
+    </section>
+
+    <!-- Faixa Editorial CPLP Fashion Week -->
+    <section class="strip-fashion-week" aria-label="Caso de Sucesso Fashion Week">
+      <div class="strip-fw-container">
+        <div class="fw-headline-group">
+          <span class="fw-kicker">Estudo de Caso Internacional</span>
+          <h2 class="fw-title">CPLP Fashion Week 4ª Edição — Lisboa</h2>
+        </div>
+        <div class="fw-stats-strip">
+          <div class="fw-stat-item">
+            <span class="fw-stat-num">4ª</span>
+            <span class="fw-stat-lbl">Edição Lisboa</span>
+          </div>
+          <div class="fw-stat-item">
+            <span class="fw-stat-num">100%</span>
+            <span class="fw-stat-lbl">Digital & Seguro</span>
+          </div>
+          <div class="fw-stat-item">
+            <span class="fw-stat-num">9+</span>
+            <span class="fw-stat-lbl">Países CPLP</span>
+          </div>
+          <div class="fw-stat-item">
+            <span class="fw-stat-num">0</span>
+            <span class="fw-stat-lbl">Planilhas Perdidas</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção: Os 4 Atos da Passarela (Metodologia) -->
+    <section id="atos" class="section-editorial">
+      <div class="section-head-fashion">
+        <span class="section-kicker-gold">Metodologia de Curadoria</span>
+        <h2 class="section-title-fashion">Os Quatro Atos da <em>Passarela</em></h2>
+        <p class="section-desc-fashion">
+          Do primeiro alinhamento com os estilistas até a ordem oficial de entrada no desfile, a CastLink orquestra cada detalhe com rigor editorial e segurança jurídica.
+        </p>
+      </div>
+
+      <div class="acts-grid">
+        <article class="act-card">
+          <span class="act-num-roman">I</span>
+          <h3 class="act-title">A Curadoria do Conceito</h3>
+          <p class="act-desc">
+            Definição do briefing visual, alinhamento dos estilistas convidados, critérios antropométricos da coleção e cronograma de provas de vestuário.
+          </p>
+          <span class="act-meta">Ato 1 • Briefing & Estruturação</span>
+        </article>
+
+        <article class="act-card">
+          <span class="act-num-roman">II</span>
+          <h3 class="act-title">O Composite & Ingestão</h3>
+          <p class="act-desc">
+            Submissão padronizada de fichas por agências credenciadas ou candidaturas diretas. Upload de polaroides sem maquiagem e medidas oficiais verificadas.
+          </p>
+          <span class="act-meta">Ato 2 • Ingestão Padronizada</span>
+        </article>
+
+        <article class="act-card">
+          <span class="act-num-roman">III</span>
+          <h3 class="act-title">A Pista & Fitting Room</h3>
+          <p class="act-desc">
+            Votação confidencial do júri e estilistas em tempo real. Cada criador avalia seu lookbook privado, convocando modelos para ajuste de peças em backstage.
+          </p>
+          <span class="act-meta">Ato 3 • Prova Operacional</span>
+        </article>
+
+        <article class="act-card">
+          <span class="act-num-roman">IV</span>
+          <h3 class="act-title">O Line-Up Oficial</h3>
+          <p class="act-desc">
+            Consolidação instantânea dos selecionados, emissão do mapa de camarim, relatórios executivos para produção e formalização de consentimento de imagem RGPD.
+          </p>
+          <span class="act-meta">Ato 4 • Decisão & Backstage</span>
+        </article>
+      </div>
+    </section>
+
+    <!-- Seção: Os 5 Papéis no Atelier Digital (Segregação de Acessos) -->
+    <section id="papeis" class="section-editorial" style="background: rgba(10, 12, 17, 0.4); border-top: 1px solid var(--border-gold-subtle); border-bottom: 1px solid var(--border-gold-subtle);">
+      <div class="section-head-fashion">
+        <span class="section-kicker-gold">Arquitetura de Sigilo</span>
+        <h2 class="section-title-fashion">Cinco Perfis Segregados no <em>Atelier</em></h2>
+        <p class="section-desc-fashion">
+          Nenhuma agência vê os modelos da concorrente. Nenhum estilista visualiza cachês contratuais. Cada participante opera estritamente no seu nível autorizado de confidencialidade.
+        </p>
+      </div>
+
+      <div class="roles-grid">
+        <div class="role-card-fashion">
+          <span class="role-badge">Perfil 01 • Governança</span>
+          <h3 class="role-title">Direção Geral & Produção</h3>
+          <p class="role-text">
+            Controle master do evento, visão completa de todas as candidaturas, line-ups e relatórios consolidados em tempo real.
+          </p>
+        </div>
+
+        <div class="role-card-fashion">
+          <span class="role-badge">Perfil 02 • Curadoria</span>
+          <h3 class="role-title">Direção de Casting</h3>
+          <p class="role-text">
+            Triagem técnica de composites, validação de medidas de passarela, agendamento de provas e mediação entre estilistas e agências.
+          </p>
+        </div>
+
+        <div class="role-card-fashion">
+          <span class="role-badge">Perfil 03 • Criação</span>
+          <h3 class="role-title">Estilistas Convidados</h3>
+          <p class="role-text">
+            Cabine privada de votação e seleção por coleção. O criador aprova talentos para o seu desfile sem interferência externa.
+          </p>
+        </div>
+      </div>
+
+      <div class="roles-grid-bottom">
+        <div class="role-card-fashion">
+          <span class="role-badge">Perfil 04 • Representação</span>
+          <h3 class="role-title">Agências de Modelos Credenciadas</h3>
+          <p class="role-text">
+            Painel exclusivo para submeter composites oficiais do seu casting, acompanhar convocações de fitting e gerir confirmações de presença.
+          </p>
+        </div>
+
+        <div class="role-card-fashion">
+          <span class="role-badge">Perfil 05 • Participação</span>
+          <h3 class="role-title">Modelos & Talentos</h3>
+          <p class="role-text">
+            Acesso pessoal para conferência de horários de audição, atualização de composite, termos de uso de imagem e consentimento RGPD/LGPD.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Estudo de Caso Editorial: CPLP Fashion Week Lisboa -->
+    <section id="cplp-fashion-week" class="section-editorial">
+      <div class="cplp-spread">
+        <div>
+          <span class="cplp-tag">Caso de Sucesso de Alta Costura</span>
+          <h2 class="cplp-title">CPLP Fashion Week Lisboa</h2>
+          <p class="cplp-text">
+            Na 4ª edição realizada em Lisboa (maio de 2026), a CPLP Fashion Week adotou a CastLink como sua espinha dorsal tecnológica. A plataforma unificou agências de múltiplos países de língua portuguesa, eliminando o atrito de comunicação entre fusos horários e elevando o padrão de organização das audições internacionais.
+          </p>
+          <div class="cplp-metrics-grid">
+            <div class="cplp-m-card">
+              <span class="cplp-m-val">4ª Edição</span>
+              <span class="cplp-m-lbl">Palco Lisboa 2026</span>
+            </div>
+            <div class="cplp-m-card">
+              <span class="cplp-m-val">Zero Falhas</span>
+              <span class="cplp-m-lbl">Auditoria e Fitting</span>
+            </div>
+            <div class="cplp-m-card">
+              <span class="cplp-m-val">Presigned URLs</span>
+              <span class="cplp-m-lbl">Fotos Privadas em Alta Definição</span>
+            </div>
+            <div class="cplp-m-card">
+              <span class="cplp-m-val">RGPD Compliance</span>
+              <span class="cplp-m-lbl">Direitos de Imagem Auditáveis</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cplp-quote-fashion">
+          <span class="quote-dropcap">“</span>
+          <blockquote class="quote-fashion-body">
+            A CastLink transformou a seleção da CPLP Fashion Week. Pela primeira vez, estilistas convidados e direção tiveram uma visão limpa, elegante e confidencial do elenco, com medidas exatas e line-ups consolidados em segundos.
+          </blockquote>
+          <span class="quote-fashion-author">Coordenação Executiva — CPLP Fashion Week Lisboa</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção: Tabela Comparativa de Alta Costura -->
+    <section id="comparativo-atelier" class="section-editorial" style="background: rgba(10, 12, 17, 0.4); border-top: 1px solid var(--border-gold-subtle); border-bottom: 1px solid var(--border-gold-subtle);">
+      <div class="section-head-fashion">
+        <span class="section-kicker-gold">Contraste de Padrões</span>
+        <h2 class="section-title-fashion">Planilhas & Grupos de Mensagem vs. <em>CastLink</em></h2>
+        <p class="section-desc-fashion">
+          O padrão das marcas de luxo não tolera links expirados nem desorganização de bastidores. Veja a diferença entre a improvisação e a tecnologia de passarela.
+        </p>
+      </div>
+
+      <div class="table-luxury-wrapper">
+        <table class="table-luxury">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 34%;">Dimensão Operacional</th>
+              <th scope="col" style="width: 33%;">Método Improvisado (Planilhas & WhatsApp)</th>
+              <th scope="col" class="col-castlink-luxe" style="width: 33%;">Plataforma CastLink Atelier</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Armazenamento de Composites & Polaroides</strong></td>
+              <td>Links do WeTransfer/Google Drive expirados em conversas dispersas</td>
+              <td class="col-castlink-luxe">Storage de alta segurança R2/S3 com URLs temporárias e criptografia nativa</td>
+            </tr>
+            <tr>
+              <td><strong>Confidencialidade entre Agências</strong></td>
+              <td>Exposição inadvertida de contatos, nomes e valores em grupos abertos</td>
+              <td class="col-castlink-luxe">5 perfis estanques: cada agência gerencia exclusivamente o seu elenco</td>
+            </tr>
+            <tr>
+              <td><strong>Padrão de Medidas para Passarela</strong></td>
+              <td>Formatos inconsistentes digitados em mensagens de texto</td>
+              <td class="col-castlink-luxe">Ficha técnica padronizada (altura, busto, cintura, quadril, calçado)</td>
+            </tr>
+            <tr>
+              <td><strong>Segurança Jurídica & RGPD</strong></td>
+              <td>Consentimentos informais sem valor probatório em caso de litígio</td>
+              <td class="col-castlink-luxe">Assinatura e termos de imagem digitais registrados com carimbo de tempo</td>
+            </tr>
+            <tr>
+              <td><strong>Geração do Line-Up de Desfile</strong></td>
+              <td>Horas de digitação e reordenação manual na véspera do evento</td>
+              <td class="col-castlink-luxe">Exportação imediata de relatórios e ordem de passarela em tempo real</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Seção Formulário VIP Atelier -->
+    <section id="atelier-demo" class="section-editorial">
+      <div class="demo-atelier-grid">
+        <div class="atelier-info">
+          <span class="section-kicker-gold">Implantação Sob Medida</span>
+          <h2 class="section-title-fashion">Solicite uma Demonstração Privada para a sua <em>Produção</em></h2>
+          <p class="hero-lead">
+            Seja para uma semana de moda de prestígio, campanha de alta costura ou produção audiovisual internacional, descubra como a CastLink pode ser configurada para o seu padrão de exigência.
+          </p>
+          <div class="atelier-features-list">
+            <div class="atelier-feat-item">
+              <span class="atelier-feat-icon">✦</span>
+              <span>Apresentação executiva conduzida por especialistas em até 48 horas</span>
+            </div>
+            <div class="atelier-feat-item">
+              <span class="atelier-feat-icon">✦</span>
+              <span>Ambiente de homologação personalizado com a identidade da sua marca</span>
+            </div>
+            <div class="atelier-feat-item">
+              <span class="atelier-feat-icon">✦</span>
+              <span>Suporte operacional dedicado durante as audições e provas de vestuário</span>
+            </div>
+            <div class="atelier-feat-item">
+              <span class="atelier-feat-icon">✉</span>
+              <span>Canal de referência institucional: <strong>castlink.agency@gmail.com</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="atelier-form-box">
+          <h3 class="form-head-luxe">Agendar Sessão Privada</h3>
+          <p class="form-sub-luxe">Preencha os dados da sua organização para receber credenciais exclusivas.</p>
+
+          <form onsubmit="event.preventDefault(); alert('Solicitação recebida com sucesso pelo ecossistema CastLink Atelier. Nossa equipe entrará em contato via e-mail institucional.');">
+            <div class="form-row-2">
+              <div class="form-group-luxe">
+                <label for="luxe-nome">Nome Completo *</label>
+                <input type="text" id="luxe-nome" class="form-input-luxe" placeholder="Seu nome e sobrenome" required autocomplete="name">
+              </div>
+              <div class="form-group-luxe">
+                <label for="luxe-cargo">Cargo / Função *</label>
+                <input type="text" id="luxe-cargo" class="form-input-luxe" placeholder="Ex: Diretor Criativo, Casting Director" required autocomplete="organization-title">
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group-luxe">
+                <label for="luxe-empresa">Marca / Semana de Moda / Produtora *</label>
+                <input type="text" id="luxe-empresa" class="form-input-luxe" placeholder="Nome da organização" required autocomplete="organization">
+              </div>
+              <div class="form-group-luxe">
+                <label for="luxe-email">E-mail Institucional *</label>
+                <input type="email" id="luxe-email" class="form-input-luxe" placeholder="seuemail@organizacao.com" required autocomplete="email">
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group-luxe">
+                <label for="luxe-tipo">Tipo de Evento ou Produção *</label>
+                <select id="luxe-tipo" class="form-input-luxe" required>
+                  <option value="" disabled selected>Selecione a categoria</option>
+                  <option value="fashion-week">Semana de Moda / Runway Oficial</option>
+                  <option value="campanha-editorial">Campanha Editorial de Alta Costura</option>
+                  <option value="publicidade">Campanha Publicitária de Luxo</option>
+                  <option value="audiovisual">Cinema / Série / Audiovisual</option>
+                  <option value="agencia">Gestão Contínua de Agência de Modelos</option>
+                </select>
+              </div>
+              <div class="form-group-luxe">
+                <label for="luxe-volume">Volume Estimado de Modelos</label>
+                <select id="luxe-volume" class="form-input-luxe">
+                  <option value="ate-50">Até 50 participantes</option>
+                  <option value="50-200">50 a 200 participantes</option>
+                  <option value="200-500">200 a 500 participantes</option>
+                  <option value="500+">Mais de 500 participantes</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group-luxe">
+              <label for="luxe-detalhes">Particularidades da Coleção ou Prazos</label>
+              <textarea id="luxe-detalhes" class="form-input-luxe" rows="3" placeholder="Indique a data estimada do desfile, local das audições ou necessidades específicas de fitting..."></textarea>
+            </div>
+
+            <button type="submit" class="btn-form-luxe">
+              Solicitar Acesso ao Atelier Privado
+            </button>
+
+            <p class="form-security-note">
+              🔒 Tratamento estrito sob conformidade RGPD & Sigilo Profissional de Curadoria.
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé Editorial de Alta Costura -->
+  <footer class="footer-editorial" role="contentinfo">
+    <div class="footer-container">
+      <div class="footer-columns-luxe">
+        <div>
+          <span class="footer-brand-title">CASTLINK</span>
+          <p class="footer-brand-sub">Runway & Editorial Casting Platform</p>
+          <p class="footer-brand-p">
+            Infraestrutura internacional para a gestão confidencial de castings na moda de alta costura, campanhas editoriais e grandes eventos globais.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Metodologia</h4>
+          <ul class="footer-links-list">
+            <li><a href="#atos">Os Quatro Atos</a></li>
+            <li><a href="#papeis">Segregação de Perfis</a></li>
+            <li><a href="#cplp-fashion-week">CPLP Fashion Week</a></li>
+            <li><a href="#comparativo-atelier">Comparativo de Pista</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Atelier</h4>
+          <ul class="footer-links-list">
+            <li><a href="#atelier-demo">Direção de Desfile</a></li>
+            <li><a href="#atelier-demo">Estilistas Convidados</a></li>
+            <li><a href="#atelier-demo">Agências Credenciadas</a></li>
+            <li><a href="#atelier-demo">Composites & Medições</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Institucional</h4>
+          <ul class="footer-links-list">
+            <li><a href="mailto:castlink.agency@gmail.com">castlink.agency@gmail.com</a></li>
+            <li><a href="https://castlink.world" target="_blank" rel="noopener">Website Oficial</a></li>
+            <li><a href="#atelier-demo">Proteção de Imagem RGPD</a></li>
+            <li><a href="#atelier-demo">Criptografia Cloudflare R2</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom-luxe">
+        <div>
+          &copy; 2026 CastLink World Platform. Todos os direitos reservados.
+        </div>
+        <div class="footer-governance-pill">
+          ⚖️ <strong>GOVERNANÇA GARIMPO SITES:</strong> Protótipo visual versão <strong>v2</strong> concebido pelo agente <strong>Esboços sites</strong> para <strong>CastLink World</strong>, em atendimento às diretrizes de Alta Costura de <strong>Paulo Nunes</strong>. A publicação de preview via GitHub Pages é uma prévia técnica de teste para avaliação humana. NÃO constitui aprovação comercial nem autoriza contato externo com o cliente. Aprovação soberana exclusiva de <strong>Paulo Nunes</strong>.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Barra Móvel Flutuante para Conversão Rápida -->
+  <div class="mobile-fashion-bar" aria-label="Ações Rápidas Mobile">
+    <div class="inner-bar">
+      <a href="#atelier-demo" class="btn-mob-demo">✦ Solicitar Demo VIP</a>
+      <a href="#"  onclick="alert('Você já está visualizando o protótipo autônomo offline completo (v2) com todos os estilos de alta costura embutidos.'); return false;" class="btn-mob-dl">📥 Baixar v2</a>
+    </div>
+  </div>
+  
+</body>
+</html>
