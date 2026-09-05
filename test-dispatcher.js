@@ -27,6 +27,7 @@ const {
   validateBuildApproval,
   assertBuildApproved,
   normalizeBuildDecision,
+  executeBuildSite,
   BUILD_DECISION_PENDING,
   BUILD_DECISION_APPROVED,
   BUILD_DECISION_REJECTED,
@@ -34,6 +35,17 @@ const {
   BUILD_STATUS_APPROVED,
   BUILD_STATUS_REJECTED
 } = require('./dispatcher');
+
+const {
+  buildProductionSite,
+  validateProjectSlug,
+  validateVersion,
+  assertValidCanonicalDestination,
+  resolvePrototypeSource,
+  resolveCanonicalDestination,
+  sanitizeHtml,
+  validateBuiltFiles
+} = require('./site-builder');
 
 function runTestSuite() {
   console.log('========================================================================');
@@ -940,6 +952,650 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       name: 'Preservação funcional de --open-production-site',
       expected: 'openProductionSiteInBrowser exportada e resolvendo caminho canônico',
       actual: `isFunction: ${typeof openProductionSiteInBrowser === 'function'} | exists: ${siteInfo.exists}`,
+      passed
+    });
+  }
+
+  // Helper para criar oportunidade mock isolada em diretório temporário
+  function createIsolatedMockProject(baseDir, projectSlug, version, options = {}) {
+    const projDir = path.join(baseDir, projectSlug);
+    const verDir = path.join(projDir, version);
+    fs.mkdirSync(verDir, { recursive: true });
+
+    const htmlContent = options.htmlContent || [
+      '<!DOCTYPE html>',
+      '<html lang="pt-BR">',
+      '<head><meta charset="UTF-8"><title>Mock Corporate</title><link rel="stylesheet" href="styles.css"></head>',
+      '<body>',
+      '  <!-- Barra de Controle Garimpo Sites -->',
+      '  <aside class="control-bar"><span class="status-badge">⚡ VISUALIZAR PRÉVIA</span><a href="mock-standalone.html" download="mock-standalone.html">Baixar</a></aside>',
+      '  <header><h1>Mock Corporate Presentation</h1></header>',
+      '  <main><p>Valid business content for production site demonstration with rich layout.</p></main>',
+      '  <footer>',
+      '    <div class="footer-governance-pill">⚖️ GOVERNANÇA GARIMPO SITES: Protótipo de teste</div>',
+      '    <p>&copy; 2026 Mock Corporate.</p>',
+      '  </footer>',
+      '</body>',
+      '</html>'
+    ].join('\n');
+
+    const cssContent = options.cssContent || [
+      'body { font-family: sans-serif; margin: 0; padding: 20px; }',
+      'header h1 { color: #1a1a1a; font-size: 28px; }',
+      'main p { color: #555; line-height: 1.6; }'
+    ].join('\n');
+
+    fs.writeFileSync(path.join(verDir, 'index.html'), htmlContent, 'utf8');
+    fs.writeFileSync(path.join(verDir, 'styles.css'), cssContent, 'utf8');
+
+    if (options.includeScript) {
+      fs.writeFileSync(path.join(verDir, 'script.js'), 'console.log("Mock JS Active");', 'utf8');
+    }
+
+    const manifest = {
+      projectName: 'Mock Corporate',
+      projectSlug: projectSlug,
+      version: version,
+      status: options.status || (options.approved ? 'APPROVED' : 'PENDING_APPROVAL'),
+      approvedBy: options.approvedBy !== undefined ? options.approvedBy : (options.approved ? 'Paulo Nunes' : null),
+      approvedAt: options.approvedAt !== undefined ? options.approvedAt : (options.approved ? '2026-09-05T12:00:00.000Z' : null),
+      ...(options.buildApproval !== undefined ? { buildApproval: options.buildApproval } : (options.approved ? {
+        buildApproval: {
+          approved: true,
+          decision: 'APPROVED',
+          decisionBy: 'Paulo Nunes',
+          decisionAt: '2026-09-05T12:00:00.000Z'
+        }
+      } : {}))
+    };
+
+    fs.writeFileSync(path.join(projDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+
+    return { projDir, verDir, manifest };
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 29: build_blocked_without_approval
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-29-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-sem-aprovacao', 'v1', { approved: false });
+      let errorThrown = null;
+      try {
+        executeBuildSite('empresa-sem-aprovacao', 'v1', { baseDir: tempDir });
+      } catch (err) {
+        errorThrown = err;
+      }
+      const destExists = fs.existsSync(path.join(tempDir, 'empresa-sem-aprovacao', 'site-producao'));
+      const passed = Boolean(errorThrown) && (errorThrown.code === 'BUILD_APPROVAL_REQUIRED') && (!destExists);
+      results.push({
+        testNumber: 29,
+        name: 'build_blocked_without_approval (Bloqueio sem aprovação)',
+        expected: 'BUILD_APPROVAL_REQUIRED e site-producao não criado',
+        actual: `code: ${errorThrown?.code} | destExists: ${destExists}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 30: build_blocked_when_pending
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-30-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pendente', 'v1', {
+        buildApproval: { approved: false, decision: 'PENDING', decisionBy: null, decisionAt: null }
+      });
+      let errorThrown = null;
+      try {
+        executeBuildSite('empresa-pendente', 'v1', { baseDir: tempDir });
+      } catch (err) {
+        errorThrown = err;
+      }
+      const destExists = fs.existsSync(path.join(tempDir, 'empresa-pendente', 'site-producao'));
+      const passed = Boolean(errorThrown) && (errorThrown.code === 'BUILD_APPROVAL_REQUIRED') && (!destExists);
+      results.push({
+        testNumber: 30,
+        name: 'build_blocked_when_pending (Bloqueio em PENDING)',
+        expected: 'BUILD_APPROVAL_REQUIRED e site-producao não criado',
+        actual: `code: ${errorThrown?.code} | destExists: ${destExists}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 31: build_blocked_when_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-31-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-rejeitada', 'v1', {
+        buildApproval: { approved: false, decision: 'REJECTED', decisionBy: 'Paulo Nunes', decisionAt: '2026-09-05T12:00:00Z' }
+      });
+      let errorThrown = null;
+      try {
+        executeBuildSite('empresa-rejeitada', 'v1', { baseDir: tempDir });
+      } catch (err) {
+        errorThrown = err;
+      }
+      const destExists = fs.existsSync(path.join(tempDir, 'empresa-rejeitada', 'site-producao'));
+      const passed = Boolean(errorThrown) && (errorThrown.code === 'BUILD_APPROVAL_REQUIRED') && (!destExists);
+      results.push({
+        testNumber: 31,
+        name: 'build_blocked_when_rejected (Bloqueio em REJECTED)',
+        expected: 'BUILD_APPROVAL_REQUIRED e site-producao não criado',
+        actual: `code: ${errorThrown?.code} | destExists: ${destExists}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 32: build_allowed_when_approved
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-32-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-aprovada', 'v1', { approved: true, includeScript: true });
+      const res = executeBuildSite('empresa-aprovada', 'v1', { baseDir: tempDir });
+      const destIndex = path.join(tempDir, 'empresa-aprovada', 'site-producao', 'index.html');
+      const destStyles = path.join(tempDir, 'empresa-aprovada', 'site-producao', 'styles.css');
+      const destScript = path.join(tempDir, 'empresa-aprovada', 'site-producao', 'script.js');
+
+      const passed = (res.success === true) &&
+                     fs.existsSync(destIndex) &&
+                     fs.existsSync(destStyles) &&
+                     fs.existsSync(destScript);
+      results.push({
+        testNumber: 32,
+        name: 'build_allowed_when_approved (Construção permitida com APPROVED)',
+        expected: 'success: true e todos os arquivos em site-producao',
+        actual: `success: ${res.success} | index: ${fs.existsSync(destIndex)} | styles: ${fs.existsSync(destStyles)}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 33: cross_project_isolation
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-33-'));
+    try {
+      createIsolatedMockProject(tempDir, 'projeto-alfa', 'v1', { approved: true });
+      createIsolatedMockProject(tempDir, 'projeto-beta', 'v1', { approved: false });
+
+      // Tentativa de construir beta (não aprovado) deve falhar
+      let betaError = null;
+      try {
+        executeBuildSite('projeto-beta', 'v1', { baseDir: tempDir });
+      } catch (e) {
+        betaError = e;
+      }
+
+      // Tentativa de passar manifesto de outro slug para alfa deve falhar por inconsistência
+      let mismatchError = null;
+      try {
+        executeBuildSite('projeto-alfa', 'v1', {
+          baseDir: tempDir,
+          manifestOverride: { projectSlug: 'projeto-beta', buildApproval: { approved: true, decision: 'APPROVED' } }
+        });
+      } catch (e) {
+        mismatchError = e;
+      }
+
+      const passed = (betaError?.code === 'BUILD_APPROVAL_REQUIRED') &&
+                     (mismatchError?.code === 'CROSS_PROJECT_SLUG_MISMATCH');
+      results.push({
+        testNumber: 33,
+        name: 'cross_project_isolation (Isolamento total entre oportunidades)',
+        expected: 'beta bloqueado e mismatch rejeitado',
+        actual: `betaCode: ${betaError?.code} | mismatchCode: ${mismatchError?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 34: prevent_previews_garimpo_write
+  // --------------------------------------------------------------------------
+  {
+    let blockedDestError = null;
+    try {
+      assertValidCanonicalDestination('C:\\Users\\35tul\\previews-garimpo\\castlink-world\\site-producao', 'castlink-world');
+    } catch (e) {
+      blockedDestError = e;
+    }
+
+    let blockedStagingError = null;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-34-'));
+    try {
+      createIsolatedMockProject(tempDir, 'slug-seguranca', 'v1', { approved: true });
+      try {
+        buildProductionSite('slug-seguranca', 'v1', {
+          baseDir: tempDir,
+          stagingDir: 'C:\\Users\\35tul\\previews-garimpo\\fake-staging-test'
+        });
+      } catch (e) {
+        blockedStagingError = e;
+      }
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+
+    const passed = (blockedDestError?.code === 'FORBIDDEN_OUTPUT_PATH') &&
+                   (blockedStagingError?.code === 'FORBIDDEN_STAGING_PATH');
+    results.push({
+      testNumber: 34,
+      name: 'prevent_previews_garimpo_write (Bloqueio estrito de previews-garimpo)',
+      expected: 'FORBIDDEN_OUTPUT_PATH e FORBIDDEN_STAGING_PATH',
+      actual: `destError: ${blockedDestError?.code} | stagingError: ${blockedStagingError?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 35: canonical_output_path_enforced
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-35-'));
+    try {
+      const canonicalPath = resolveCanonicalDestination('oportunidade-teste', { baseDir: tempDir });
+      const expectedEnd = path.join('oportunidade-teste', 'site-producao').toLowerCase();
+      const endsCorrectly = canonicalPath.toLowerCase().endsWith(expectedEnd);
+
+      let wrongDestError = null;
+      try {
+        assertValidCanonicalDestination(path.join(tempDir, 'pasta-errada'), 'oportunidade-teste');
+      } catch (e) {
+        wrongDestError = e;
+      }
+
+      const passed = endsCorrectly && (wrongDestError?.code === 'INVALID_CANONICAL_DESTINATION');
+      results.push({
+        testNumber: 35,
+        name: 'canonical_output_path_enforced (Destino canônico forçado)',
+        expected: 'termina em oportunidade-teste\\site-producao e rejeita outros destinos',
+        actual: `endsCorrectly: ${endsCorrectly} | errorCode: ${wrongDestError?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 36: atomic_build_rollback_on_failure
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-36-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-atomica', 'v1', { approved: true });
+      const destDir = path.join(tempDir, 'empresa-atomica', 'site-producao');
+      fs.mkdirSync(destDir, { recursive: true });
+      const originalFile = path.join(destDir, 'index.html');
+      fs.writeFileSync(originalFile, 'VERSAO_ANTERIOR_ORIGINAL_INTACTA', 'utf8');
+
+      let buildError = null;
+      try {
+        buildProductionSite('empresa-atomica', 'v1', {
+          baseDir: tempDir,
+          simulateFailureDuringBuild: true
+        });
+      } catch (e) {
+        buildError = e;
+      }
+
+      const currentContent = fs.readFileSync(originalFile, 'utf8');
+      const stagingFolders = fs.readdirSync(path.join(tempDir, 'empresa-atomica'))
+        .filter(f => f.startsWith('.staging-build-'));
+
+      const passed = Boolean(buildError) &&
+                     (currentContent === 'VERSAO_ANTERIOR_ORIGINAL_INTACTA') &&
+                     (stagingFolders.length === 0);
+      results.push({
+        testNumber: 36,
+        name: 'atomic_build_rollback_on_failure (Rollback atômico em caso de erro)',
+        expected: 'erro lançado, produção anterior intacta e zero pastas staging órfãs',
+        actual: `contentIntact: ${currentContent === 'VERSAO_ANTERIOR_ORIGINAL_INTACTA'} | stagingCount: ${stagingFolders.length}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 37: preview_elements_stripped
+  // --------------------------------------------------------------------------
+  {
+    const sampleHtml = [
+      '<!DOCTYPE html>',
+      '<html><head><title>Test</title></head><body>',
+      '  <!-- Barra de Controle Garimpo Sites -->',
+      '  <aside class="control-bar"><span class="status-badge">⚡ VISUALIZAR PRÉVIA</span><a href="test-standalone.html" download="test-standalone.html">Baixar</a></aside>',
+      '  <div id="garimpo-preview-bar">Preview Header</div>',
+      '  <main><h1>Conteúdo de Negócio Legítimo</h1></main>',
+      '  <footer>',
+      '    <div class="footer-governance-pill">⚖️ GOVERNANÇA GARIMPO SITES: Rascunho</div>',
+      '    <p>Copyright 2026</p>',
+      '  </footer>',
+      '</body></html>'
+    ].join('\n');
+
+    const sanitized = sanitizeHtml(sampleHtml);
+
+    const hasControlBar = sanitized.includes('control-bar');
+    const hasPreviewBar = sanitized.includes('garimpo-preview-bar');
+    const hasGovPill = sanitized.includes('footer-governance-pill');
+    const hasStandalone = sanitized.includes('standalone.html');
+    const hasLegitContent = sanitized.includes('Conteúdo de Negócio Legítimo');
+
+    const passed = (!hasControlBar) && (!hasPreviewBar) && (!hasGovPill) && (!hasStandalone) && hasLegitContent;
+    results.push({
+      testNumber: 37,
+      name: 'preview_elements_stripped (Higienização completa de elementos de prévia)',
+      expected: 'control-bar, preview-bar, pílula de governança e download removidos; conteúdo mantido',
+      actual: `hasControl: ${hasControlBar} | hasGovPill: ${hasGovPill} | hasStandalone: ${hasStandalone} | hasLegit: ${hasLegitContent}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 38: output_files_validation
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-38-'));
+    try {
+      let missingIndexErr = null;
+      try {
+        validateBuiltFiles(tempDir, ['index.html']);
+      } catch (e) {
+        missingIndexErr = e;
+      }
+
+      // Cria index.html minúsculo/inválido (< 200 bytes)
+      fs.writeFileSync(path.join(tempDir, 'index.html'), '<html><body>Pequeno</body></html>', 'utf8');
+      let smallIndexErr = null;
+      try {
+        validateBuiltFiles(tempDir, ['index.html']);
+      } catch (e) {
+        smallIndexErr = e;
+      }
+
+      const passed = (missingIndexErr?.code === 'MISSING_INDEX_HTML') &&
+                     (smallIndexErr?.code === 'INVALID_INDEX_HTML_SIZE');
+      results.push({
+        testNumber: 38,
+        name: 'output_files_validation (Validação estrutural dos arquivos)',
+        expected: 'MISSING_INDEX_HTML e INVALID_INDEX_HTML_SIZE detectados',
+        actual: `missingCode: ${missingIndexErr?.code} | sizeCode: ${smallIndexErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 39: buildExecution_persisted_after_success
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-39-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-exec-persist', 'v2', { approved: true });
+      executeBuildSite('empresa-exec-persist', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-exec-persist', 'manifest.json'), 'utf8'));
+      const exec = manifestRaw.buildExecution;
+
+      const passed = Boolean(exec) &&
+                     (exec.status === 'CONCLUIDA') &&
+                     (exec.projectSlug === 'empresa-exec-persist') &&
+                     (exec.version === 'v2') &&
+                     Boolean(exec.executedAt);
+      results.push({
+        testNumber: 39,
+        name: 'buildExecution_persisted_after_success (Persistência de buildExecution)',
+        expected: 'status: CONCLUIDA, projectSlug e data de execução registrados',
+        actual: `status: ${exec?.status} | version: ${exec?.version} | hasTimestamp: ${Boolean(exec?.executedAt)}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 40: buildApproval_unchanged_after_build
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-40-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-approval-intacta', 'v2', {
+        approved: true,
+        buildApproval: {
+          approved: true,
+          decision: 'APPROVED',
+          decisionBy: 'Paulo Nunes',
+          decisionAt: '2026-09-05T12:34:56.789Z'
+        }
+      });
+      executeBuildSite('empresa-approval-intacta', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-approval-intacta', 'manifest.json'), 'utf8'));
+      const app = manifestRaw.buildApproval;
+
+      const passed = (app.approved === true) &&
+                     (app.decision === 'APPROVED') &&
+                     (app.decisionBy === 'Paulo Nunes') &&
+                     (app.decisionAt === '2026-09-05T12:34:56.789Z');
+      results.push({
+        testNumber: 40,
+        name: 'buildApproval_unchanged_after_build (buildApproval inalterado após build)',
+        expected: 'buildApproval preservado com decisão humana original intacta',
+        actual: `approved: ${app?.approved} | decision: ${app?.decision} | decisionBy: ${app?.decisionBy}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 41: commercial_gate_unaffected
+  // --------------------------------------------------------------------------
+  {
+    const gateRes = validateEmailGate('castlink-world', 'v2');
+    const passed = (gateRes.allowed === true) && (gateRes.status === 'APPROVED') && (gateRes.dryRun === true);
+    results.push({
+      testNumber: 41,
+      name: 'commercial_gate_unaffected (Gate Comercial 100% inalterado)',
+      expected: 'validateEmailGate allowed: true e status: APPROVED',
+      actual: `allowed: ${gateRes.allowed} | status: ${gateRes.status} | dryRun: ${gateRes.dryRun}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 42: production_send_unchanged
+  // --------------------------------------------------------------------------
+  {
+    const mockPendingResult = validateEmailGate('castlink-world', 'v2', {
+      manifestOverride: {
+        projectName: 'CastLink',
+        projectSlug: 'castlink-world',
+        version: 'v2',
+        status: 'PENDING_APPROVAL'
+      }
+    });
+
+    const passed = (mockPendingResult.allowed === false) && (mockPendingResult.reason === 'APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 42,
+      name: 'production_send_unchanged (--production-send e validação inalterados)',
+      expected: 'allowed: false e reason: APPROVAL_REQUIRED para pendente',
+      actual: `allowed: ${mockPendingResult.allowed} | reason: ${mockPendingResult.reason}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 43: open_production_site_preserved
+  // --------------------------------------------------------------------------
+  {
+    const siteInfo = getProductionSitePath('castlink-world');
+    const isFunc = typeof openProductionSiteInBrowser === 'function';
+    const passed = (siteInfo.exists === true) && isFunc && siteInfo.indexPath.endsWith('site-producao\\index.html');
+    results.push({
+      testNumber: 43,
+      name: 'open_production_site_preserved (Navegação de site de produção preservada)',
+      expected: 'siteInfo.exists: true e openProductionSiteInBrowser é função',
+      actual: `exists: ${siteInfo.exists} | isFunc: ${isFunc}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 44: missing_source_version_blocked
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-44-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-sem-versao', 'v1', { approved: true });
+      let errorThrown = null;
+      try {
+        executeBuildSite('empresa-sem-versao', 'v99-inexistente', { baseDir: tempDir });
+      } catch (e) {
+        errorThrown = e;
+      }
+      const passed = (errorThrown?.code === 'SOURCE_VERSION_NOT_FOUND');
+      results.push({
+        testNumber: 44,
+        name: 'missing_source_version_blocked (Bloqueio de versão de origem inexistente)',
+        expected: 'SOURCE_VERSION_NOT_FOUND',
+        actual: `code: ${errorThrown?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 45: invalid_project_slug_blocked
+  // --------------------------------------------------------------------------
+  {
+    let emptySlugErr = null;
+    let upperSlugErr = null;
+    try {
+      executeBuildSite('', 'v1');
+    } catch (e) {
+      emptySlugErr = e;
+    }
+    try {
+      executeBuildSite('SLUG_MAIUSCULO_INVALIDO!', 'v1');
+    } catch (e) {
+      upperSlugErr = e;
+    }
+    const passed = (emptySlugErr?.code === 'INVALID_PROJECT_SLUG') &&
+                   (upperSlugErr?.code === 'INVALID_PROJECT_SLUG');
+    results.push({
+      testNumber: 45,
+      name: 'invalid_project_slug_blocked (Bloqueio de projectSlug inválido)',
+      expected: 'INVALID_PROJECT_SLUG para vazio e para formato incorreto',
+      actual: `emptyCode: ${emptySlugErr?.code} | upperCode: ${upperSlugErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 46: path_traversal_blocked
+  // --------------------------------------------------------------------------
+  {
+    let slugTraversalErr = null;
+    let verTraversalErr = null;
+    try {
+      executeBuildSite('../ataque-diretorio', 'v1');
+    } catch (e) {
+      slugTraversalErr = e;
+    }
+    try {
+      executeBuildSite('projeto-valido', '../../escape');
+    } catch (e) {
+      verTraversalErr = e;
+    }
+    const passed = (slugTraversalErr?.code === 'PATH_TRAVERSAL_DETECTED') &&
+                   (verTraversalErr?.code === 'PATH_TRAVERSAL_DETECTED');
+    results.push({
+      testNumber: 46,
+      name: 'path_traversal_blocked (Bloqueio estrito de path traversal)',
+      expected: 'PATH_TRAVERSAL_DETECTED para slug e versão',
+      actual: `slugCode: ${slugTraversalErr?.code} | verCode: ${verTraversalErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 47: unexpected_output_files_blocked
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-47-'));
+    try {
+      const validIndexContent = '<!DOCTYPE html><html><head><title>OK</title></head><body><p>' + 'A'.repeat(250) + '</p></body></html>';
+      fs.writeFileSync(path.join(tempDir, 'index.html'), validIndexContent, 'utf8');
+      fs.writeFileSync(path.join(tempDir, 'styles.css'), 'body { color: black; } /* ' + 'B'.repeat(60) + ' */', 'utf8');
+      fs.writeFileSync(path.join(tempDir, 'projeto-standalone.html'), 'standalone', 'utf8');
+
+      let standaloneErr = null;
+      try {
+        validateBuiltFiles(tempDir, ['index.html', 'styles.css']);
+      } catch (e) {
+        standaloneErr = e;
+      }
+      const passed = (standaloneErr?.code === 'UNEXPECTED_STANDALONE_FILE');
+      results.push({
+        testNumber: 47,
+        name: 'unexpected_output_files_blocked (Bloqueio de arquivos standalone de teste)',
+        expected: 'UNEXPECTED_STANDALONE_FILE',
+        actual: `code: ${standaloneErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 48: existing_castlink_production_not_modified_during_tests
+  // --------------------------------------------------------------------------
+  {
+    const castlinkPath = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\site-producao\\index.html';
+    const exists = fs.existsSync(castlinkPath);
+    let sizeMatches = false;
+    if (exists) {
+      const stat = fs.statSync(castlinkPath);
+      sizeMatches = (stat.size === 32446);
+    }
+    const passed = exists && sizeMatches;
+    results.push({
+      testNumber: 48,
+      name: 'existing_castlink_production_not_modified_during_tests (Produção real intacta)',
+      expected: 'castlink-world/site-producao/index.html existe com tamanho exato de 32446 bytes',
+      actual: `exists: ${exists} | sizeMatches: ${sizeMatches}`,
       passed
     });
   }

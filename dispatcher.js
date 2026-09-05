@@ -29,6 +29,13 @@
 const fs = require('fs');
 const path = require('path');
 const { sendViaGmailApi } = require('./gmail-client');
+const {
+  buildProductionSite,
+  validateProjectSlug,
+  validateVersion,
+  resolveCanonicalDestination,
+  assertValidCanonicalDestination
+} = require('./site-builder');
 
 const OFFICIAL_SENDER = 'paulonunes.consultoriadigital@gmail.com';
 const REQUIRED_APPROVER = 'Paulo Nunes';
@@ -46,6 +53,14 @@ const BUILD_STATUS_REJECTED = 'REJEITADA';
 const VALID_BUILD_STATUSES = [BUILD_STATUS_PENDING, BUILD_STATUS_APPROVED, BUILD_STATUS_REJECTED];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Lê e analisa JSON de forma segura, removendo UTF-8 BOM se presente.
+ */
+function readJsonSafely(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  return JSON.parse(content.replace(/^\uFEFF/, ''));
+}
 
 /**
  * Localiza o arquivo de minuta correspondente ao projeto e versão.
@@ -582,7 +597,7 @@ function getBuildApproval(projectSlug, options = {}) {
     }
 
     try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      manifest = readJsonSafely(manifestPath);
     } catch (e) {
       return {
         approved: false,
@@ -665,7 +680,7 @@ function setBuildApproval(projectSlug, approved, options = {}) {
       throw new Error(`Projeto inexistente ou manifest.json não encontrado para '${projectSlug}' em: ${manifestPath}`);
     }
     try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      manifest = readJsonSafely(manifestPath);
     } catch (e) {
       throw new Error(`Falha ao ler manifest.json para '${projectSlug}': ${e.message}`);
     }
@@ -754,6 +769,93 @@ function assertBuildApproved(projectSlug, options = {}) {
     decision: validation.decision,
     decisionBy: validation.decisionBy,
     decisionAt: validation.decisionAt
+  };
+}
+
+/**
+ * Executa a construção controlada do site de produção (Fase 2).
+ *
+ * ORDEM DE OPERAÇÃO OBRIGATÓRIA (BUILD GATE):
+ * 1. Validar projectSlug e version.
+ * 2. Carregar manifest.json e verificar isolamento estrito de slug.
+ * 3. Chamar assertBuildApproved(cleanSlug) -> Bloqueio determinístico se não aprovado formalmente.
+ * 4. Executar buildProductionSite() no destino canônico exclusivo.
+ * 5. Gravar buildExecution em manifest.json (NUNCA altera buildApproval).
+ * 6. Regenerar PAINEL_APROVACAO.md com seção de execução.
+ */
+function executeBuildSite(projectSlug, version, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const cleanVersion = validateVersion(version || 'v2');
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      const err = new Error(`[MANIFESTO AUSENTE] manifest.json não encontrado para '${cleanSlug}' em: ${manifestPath}`);
+      err.code = 'MANIFEST_NOT_FOUND';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      const err = new Error(`[MANIFESTO INVÁLIDO] Falha ao analisar manifest.json para '${cleanSlug}': ${e.message}`);
+      err.code = 'INVALID_MANIFEST_JSON';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+  }
+
+  // Verificação de isolamento estrito contra o manifesto
+  if (manifest.projectSlug && manifest.projectSlug !== cleanSlug) {
+    const err = new Error(`[ISOLAMENTO VIOLADO] projectSlug solicitado (${cleanSlug}) difere do manifesto (${manifest.projectSlug})`);
+    err.code = 'CROSS_PROJECT_SLUG_MISMATCH';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // PASSO 3: BUILD GATE OBRIGATÓRIO (assertBuildApproved)
+  // Se buildApproval não for APPROVED por Paulo Nunes, lança BUILD_APPROVAL_REQUIRED
+  assertBuildApproved(cleanSlug, { ...options, manifestOverride: manifest });
+
+  // PASSO 4: CONSTRUÇÃO CONTROLADA E ATÔMICA
+  const buildResult = buildProductionSite(cleanSlug, cleanVersion, {
+    ...options,
+    manifestOverride: manifest,
+    baseDir
+  });
+
+  // PASSO 5: REGISTRO SEPARADO DE buildExecution (NUNCA altera buildApproval)
+  manifest.buildExecution = {
+    status: 'CONCLUIDA',
+    projectSlug: cleanSlug,
+    version: cleanVersion,
+    executedAt: buildResult.executedAt || new Date().toISOString()
+  };
+
+  if (!options.manifestOverride && options.save !== false) {
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  }
+
+  // PASSO 6: REGENERAR PAINEL_APROVACAO.MD
+  if (options.updatePanel !== false && !options.manifestOverride && fs.existsSync(projectDir)) {
+    generateApprovalPanel(cleanSlug, cleanVersion, {
+      ...options,
+      openInEditor: options.openInEditor !== undefined ? options.openInEditor : false
+    });
+  }
+
+  return {
+    success: true,
+    projectSlug: cleanSlug,
+    version: cleanVersion,
+    buildExecution: manifest.buildExecution,
+    buildResult
   };
 }
 
@@ -914,6 +1016,17 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     `> **COMANDOS DE DELIBERAÇÃO FORMAL:**`,
     `> - Para aprovar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-build\``,
     `> - Para rejeitar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-build\``,
+    `> - Para construir o site de produção: \`node dispatcher.js ${projectSlug} ${targetVersion} --build-site\``,
+    ``,
+    `---`,
+    ``,
+    `## 🏗️ EXECUÇÃO DA CONSTRUÇÃO DO SITE`,
+    ``,
+    `- **Status da Execução:** ${manifest.buildExecution ? (manifest.buildExecution.status === 'CONCLUIDA' ? '🟢 CONCLUÍDA' : manifest.buildExecution.status) : '⚪ NÃO INICIADA'}`,
+    `- **Projeto:** \`${projectSlug}\``,
+    `- **Versão Construída:** \`${manifest.buildExecution?.version || targetVersion}\``,
+    `- **Data/Hora da Execução:** ${manifest.buildExecution?.executedAt || 'Pendente'}`,
+    `- **Destino Canônico:** \`${siteInfo.siteDir}\``,
     ``,
     `---`,
     ``,
@@ -1212,6 +1325,27 @@ if (require.main === module) {
     process.exit(0);
   }
 
+  // Construção controlada do site de produção (Fase 2)
+  if (args.includes('--build-site')) {
+    try {
+      const buildRes = executeBuildSite(slug, version);
+      console.log(`\n====================================================`);
+      console.log(` 🏗️ CONSTRUÇÃO CONTROLADA DO SITE DE PRODUÇÃO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:      ${slug}`);
+      console.log(`Versão:       ${version}`);
+      console.log(`Status:       🟢 ${buildRes.buildExecution.status}`);
+      console.log(`Destino:      ${buildRes.buildResult.canonicalPath}`);
+      console.log(`Executado em: ${buildRes.buildExecution.executedAt}`);
+      console.log(`Arquivos:     ${buildRes.buildResult.files.join(', ')}`);
+      console.log(`Painel:       Atualizado em PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NA CONSTRUÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
   executeDispatcher(slug, version, {
     productionSend: isProduction,
     dryRun: !isProduction
@@ -1250,5 +1384,7 @@ module.exports = {
   getBuildApproval,
   setBuildApproval,
   validateBuildApproval,
-  assertBuildApproved
+  assertBuildApproved,
+  executeBuildSite,
+  buildSite: executeBuildSite
 };
