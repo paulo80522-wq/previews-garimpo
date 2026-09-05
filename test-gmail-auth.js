@@ -334,10 +334,43 @@ Prezados, segue proposta com base no protótipo visual v2 homologado.
   }
 
   // --------------------------------------------------------------------------
+  // TESTE K: Conformidade RFC 2047 no header From (Display Name com acentos)
+  // --------------------------------------------------------------------------
+  {
+    const rfcMsg = buildRfc2822Message({
+      to: 'destinatario@exemplo.com',
+      subject: 'Teste de Validação RFC 2047',
+      bodyText: 'Corpo de teste.'
+    });
+
+    const lines = rfcMsg.rawMessage.split('\r\n');
+    const fromLine = lines.find(l => l.startsWith('From:'));
+    const expectedBase64 = Buffer.from('Paulo Nunes | Consultoria de Presença Digital', 'utf8').toString('base64');
+    const expectedHeader = `From: =?UTF-8?B?${expectedBase64}?= <${OFFICIAL_SENDER}>`;
+
+    const matchEncodedWord = fromLine.match(/=\?UTF-8\?B\?([^\?]+)\?=/i);
+    let decodedName = null;
+    if (matchEncodedWord) {
+      decodedName = Buffer.from(matchEncodedWord[1], 'base64').toString('utf8');
+    }
+
+    const passed = (fromLine === expectedHeader) &&
+                   (decodedName === 'Paulo Nunes | Consultoria de Presença Digital');
+
+    results.push({
+      id: 'K',
+      name: 'Codificação RFC 2047 no header From (preservação de "Presença")',
+      expected: `From codificado com RFC 2047 decodificando para 'Paulo Nunes | Consultoria de Presença Digital'`,
+      actual: `fromLine: ${fromLine} | decodificado: '${decodedName}'`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
   // EXIBIÇÃO CONSOLIDADA DOS RESULTADOS
   // --------------------------------------------------------------------------
   console.log('\n========================================================================');
-  console.log(' RESULTADOS DA BATERIA DE TESTES DE AUTENTICAÇÃO GMAIL (A a J):');
+  console.log(' RESULTADOS DA BATERIA DE TESTES DE AUTENTICAÇÃO GMAIL (A a K):');
   console.log('========================================================================');
 
   let totalPassed = 0;

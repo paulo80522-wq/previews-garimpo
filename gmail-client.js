@@ -65,7 +65,7 @@ function buildRfc2822Message(params) {
   const bodyBase64 = Buffer.from(fullBody, 'utf8').toString('base64');
 
   const rawMessage = [
-    `From: "${SENDER_DISPLAY_NAME}" <${OFFICIAL_SENDER}>`,
+    `From: ${encodeMimeHeader(SENDER_DISPLAY_NAME)} <${OFFICIAL_SENDER}>`,
     `To: <${to.trim()}>`,
     `Subject: ${encodedSubject}`,
     'MIME-Version: 1.0',
