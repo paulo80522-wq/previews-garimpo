@@ -1,0 +1,23 @@
+# Credenciais e Segredos do Gmail / Google Cloud
+credentials.json
+token.json
+*token*.json
+client_secret*.json
+*secret*
+*refresh_token*
+*.pem
+*.key
+*.pfx
+.env
+.env.*
+.secrets/
+credentials/
+*.credentials
+
+# Diretório de segredos local do usuário
+C:/Users/35tul/.gemini/config/credentials/
+
+# Logs e Arquivos Temporários
+*.log
+scratch/
+.system_generated/

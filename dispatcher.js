@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { sendViaGmailApi } = require('./gmail-client');
 
 const OFFICIAL_SENDER = 'paulonunes.consultoriadigital@gmail.com';
 const REQUIRED_APPROVER = 'Paulo Nunes';
@@ -409,17 +410,35 @@ function validateEmailGate(projectSlug, version, options = {}) {
 }
 
 /**
- * Executor de E-mail em Modo Seguro (DRY-RUN).
- * Garante que nenhuma chamada externa aconteça nesta etapa.
+ * Executor de E-mail (Integração Segura com Gmail API após Validação do Gate).
+ *
+ * ORDEM DE OPERAÇÃO RIGOROSA (11 PASSOS):
+ * 1. Carregar manifest.json
+ * 2. Validar integridade
+ * 3. Validar status (exige APPROVED)
+ * 4. Validar approvedBy (exige "Paulo Nunes")
+ * 5. Validar approvedAt (exige data ISO válida)
+ * 6. Validar versão
+ * 7. Validar destinatário
+ * 8. Validar conteúdo/minuta
+ * 9. Validar demais regras existentes
+ * (Se QUALQUER validação falhar: ABORTAR IMEDIATAMENTE. Nenhuma chamada Gmail é inicializada)
+ * 10. Somente depois inicializar o cliente Gmail
+ * 11. Somente depois enviar (Modo DRY-RUN obrigatório por padrão. Envio real exige --production-send)
  */
-function executeDispatcher(projectSlug, version, options = {}) {
+async function executeDispatcher(projectSlug, version, options = {}) {
+  const isProductionSend = (options.productionSend === true) && (options.dryRun === false);
+  const dryRunMode = !isProductionSend;
+
   console.log('====================================================');
-  console.log(' EXECUTOR DE E-MAIL - GARIMPO SITES (MODO SEGURO)');
+  console.log(` EXECUTOR DE E-MAIL - GARIMPO SITES (${dryRunMode ? 'MODO SEGURO / DRY-RUN' : 'MODO PRODUÇÃO'})`);
   console.log('====================================================');
   console.log(`Projeto Alvo: ${projectSlug} | Versão: ${version || 'auto'}`);
+  console.log(`Modo:         ${dryRunMode ? 'DRY-RUN (Simulação sem envio externo)' : 'PRODUÇÃO REAL (--production-send)'}`);
   console.log(`Timestamp:    ${new Date().toISOString()}`);
   console.log('----------------------------------------------------');
 
+  // PASSOS 1 A 9: VALIDAÇÃO COMPLETA DO GATE HUMANO E INTEGRIDADE
   const gateResult = validateEmailGate(projectSlug, version, options);
 
   if (!gateResult.allowed) {
@@ -431,68 +450,118 @@ function executeDispatcher(projectSlug, version, options = {}) {
       gateResult.errors.forEach(err => console.error(`  - ${err}`));
     }
     console.log('----------------------------------------------------');
-    console.log('Ação: EXECUÇÃO ABORTADA. NENHUM E-MAIL FOI ENVIADO.\n');
+    console.log('Ação: EXECUÇÃO ABORTADA. NENHUM CLIENTE GMAIL INICIALIZADO. NENHUM E-MAIL ENVIADO.\n');
 
     return {
       allowed: false,
       dispatched: false,
+      blockedByGate: true,
       reason: gateResult.reason,
       status: gateResult.status,
       errors: gateResult.errors
     };
   }
 
-  // MODO DRY-RUN MANDATÓRIO
-  console.log('\n[STATUS: PERMITIDO EM MODO DRY-RUN]');
+  // PASSO 10: INICIALIZAR O CLIENTE GMAIL SOMENTE APÓS O GATE APROVAR
+  console.log('\n[STATUS: GATE FORMAL APROVADO]');
   console.log('✓ 10 de 10 Regras do Gate Satisfeitas.');
   console.log('✓ Status formal APPROVED verificado.');
   console.log(`✓ Aprovado formalmente por: ${gateResult.audit.approvedBy}`);
   console.log(`✓ Data da Aprovação:        ${gateResult.audit.approvedAt}`);
   console.log(`✓ Decisão do Gate:          ${gateResult.audit.decision}`);
   console.log('----------------------------------------------------');
-  console.log('PACOTE DE DISPARO (SIMULAÇÃO DRY-RUN):');
-  console.log(`  De:          ${gateResult.sender}`);
-  console.log(`  Para:        ${gateResult.recipient}`);
-  console.log(`  Assunto:     ${gateResult.subject}`);
-  console.log(`  Preview URL: ${gateResult.previewUrl}`);
-  console.log(`  Minuta:      ${gateResult.minutaPath}`);
-  console.log(`  Tamanho:     ${gateResult.bodyText ? gateResult.bodyText.length : 0} caracteres`);
-  console.log('----------------------------------------------------');
-  console.log('[CONFIRMAÇÃO DE SEGURANÇA]');
-  console.log('Nenhuma conexão externa efetuada.');
-  console.log('Nenhuma chamada Gmail API, SMTP ou OAuth efetuada.');
-  console.log('Disparo real inativo nesta etapa.\n');
 
-  return {
-    allowed: true,
-    status: gateResult.status,
-    dryRun: true,
-    dispatched: false,
-    dispatchMode: 'DRY_RUN_ONLY',
-    message: gateResult.message,
-    payload: {
+  const emailPayload = {
+    from: gateResult.sender,
+    to: gateResult.recipient,
+    subject: gateResult.subject,
+    bodyText: gateResult.bodyText,
+    previewUrl: gateResult.previewUrl
+  };
+
+  // PASSO 11: ENVIO VIA CLIENTE GMAIL (DRY-RUN OU PRODUÇÃO)
+  try {
+    const gmailResult = await sendViaGmailApi(emailPayload, {
+      ...options,
+      productionSend: isProductionSend,
+      dryRun: dryRunMode
+    });
+
+    if (dryRunMode) {
+      console.log('PACOTE DE DISPARO (SIMULAÇÃO DRY-RUN):');
+      console.log(`  De:          ${gateResult.sender}`);
+      console.log(`  Para:        ${gateResult.recipient}`);
+      console.log(`  Assunto:     ${gateResult.subject}`);
+      console.log(`  Preview URL: ${gateResult.previewUrl}`);
+      console.log(`  Minuta:      ${gateResult.minutaPath}`);
+      console.log(`  Tamanho:     ${gateResult.bodyText ? gateResult.bodyText.length : 0} caracteres`);
+      console.log('----------------------------------------------------');
+      console.log('[CONFIRMAÇÃO DE SEGURANÇA]');
+      console.log('Nenhuma conexão externa efetuada.');
+      console.log('Nenhuma chamada de rede à Gmail API efetuada.');
+      console.log('Modo padrão DRY-RUN mantido ativo.\n');
+    } else {
+      console.log('PACOTE DE DISPARO (PRODUÇÃO GMAIL):');
+      console.log(`  Message ID:  ${gmailResult.messageId}`);
+      console.log(`  Thread ID:   ${gmailResult.threadId}`);
+      console.log(`  De:          ${gmailResult.sender}`);
+      console.log(`  Para:        ${gmailResult.recipient}`);
+      console.log('----------------------------------------------------');
+    }
+
+    return {
+      allowed: true,
+      status: gateResult.status,
       sender: gateResult.sender,
       recipient: gateResult.recipient,
       subject: gateResult.subject,
       previewUrl: gateResult.previewUrl,
-      bodySnippet: gateResult.bodyText ? gateResult.bodyText.substring(0, 160) + '...' : '',
-      bodyLength: gateResult.bodyText ? gateResult.bodyText.length : 0
-    },
-    audit: gateResult.audit
-  };
+      dryRun: gmailResult.dryRun,
+      dispatched: gmailResult.dispatched,
+      dispatchMode: gmailResult.mode || (gmailResult.dispatched ? 'PRODUCTION' : 'DRY_RUN_ONLY'),
+      message: gmailResult.message,
+      payload: {
+        sender: gateResult.sender,
+        recipient: gateResult.recipient,
+        subject: gateResult.subject,
+        previewUrl: gateResult.previewUrl,
+        bodySnippet: gateResult.bodyText ? gateResult.bodyText.substring(0, 160) + '...' : '',
+        bodyLength: gateResult.bodyText ? gateResult.bodyText.length : 0
+      },
+      gmailResult,
+      audit: gateResult.audit
+    };
+  } catch (err) {
+    console.error(`\n[ERRO NO CLIENTE GMAIL]: ${err.message}`);
+    return {
+      allowed: true,
+      dispatched: false,
+      error: err.message,
+      reason: 'GMAIL_CLIENT_ERROR',
+      audit: gateResult.audit
+    };
+  }
 }
 
 // Interface CLI
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const slug = args[0] || 'castlink-world';
-  const version = args[1] || 'v2';
+  const isProduction = args.includes('--production-send');
+  const positionalArgs = args.filter(a => !a.startsWith('--'));
+  const slug = positionalArgs[0] || 'castlink-world';
+  const version = positionalArgs[1] || 'v2';
 
-  const result = executeDispatcher(slug, version);
-
-  if (!result.allowed) {
+  executeDispatcher(slug, version, {
+    productionSend: isProduction,
+    dryRun: !isProduction
+  }).then(result => {
+    if (!result.allowed || (isProduction && !result.dispatched)) {
+      process.exitCode = 1;
+    }
+  }).catch(err => {
+    console.error('Erro na execução do dispatcher:', err);
     process.exitCode = 1;
-  }
+  });
 }
 
 module.exports = {
