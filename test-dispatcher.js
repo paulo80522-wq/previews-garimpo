@@ -28,12 +28,24 @@ const {
   assertBuildApproved,
   normalizeBuildDecision,
   executeBuildSite,
+  executeApprovedBuild,
   BUILD_DECISION_PENDING,
   BUILD_DECISION_APPROVED,
   BUILD_DECISION_REJECTED,
   BUILD_STATUS_PENDING,
   BUILD_STATUS_APPROVED,
-  BUILD_STATUS_REJECTED
+  BUILD_STATUS_REJECTED,
+  HOMOLOGATION_DECISION_PENDING,
+  HOMOLOGATION_DECISION_APPROVED,
+  HOMOLOGATION_DECISION_REJECTED,
+  acquireBuildLock,
+  releaseBuildLock,
+  getBuildValidation,
+  assertBuildValidated,
+  validateHomologation,
+  getHomologation,
+  setHomologation,
+  assertSiteHomologated
 } = require('./dispatcher');
 
 const {
@@ -44,7 +56,8 @@ const {
   resolvePrototypeSource,
   resolveCanonicalDestination,
   sanitizeHtml,
-  validateBuiltFiles
+  validateBuiltFiles,
+  validateProductionSite
 } = require('./site-builder');
 
 function runTestSuite() {
@@ -1596,6 +1609,1074 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       name: 'existing_castlink_production_not_modified_during_tests (Produção real intacta)',
       expected: 'castlink-world/site-producao/index.html existe com tamanho exato de 32446 bytes',
       actual: `exists: ${exists} | sizeMatches: ${sizeMatches}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 49: missing_version_blocked (Exigência de versão explícita sem defaults)
+  // --------------------------------------------------------------------------
+  {
+    let emptyVersionErr = null;
+    let nullVersionErr = null;
+    try {
+      executeBuildSite('projeto-teste', '');
+    } catch (e) {
+      emptyVersionErr = e;
+    }
+    try {
+      executeBuildSite('projeto-teste', null);
+    } catch (e) {
+      nullVersionErr = e;
+    }
+    const passed = (emptyVersionErr?.code === 'VERSION_REQUIRED') &&
+                   (nullVersionErr?.code === 'VERSION_REQUIRED');
+    results.push({
+      testNumber: 49,
+      name: 'missing_version_blocked (Versão obrigatória sem fallback silencioso)',
+      expected: 'VERSION_REQUIRED para versão vazia ou nula',
+      actual: `emptyCode: ${emptyVersionErr?.code} | nullCode: ${nullVersionErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 50: concurrency_lock_acquired_and_released
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-50-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-lock-test', 'v1', { approved: true, includeScript: true });
+      const lockFile = path.join(tempDir, 'empresa-lock-test', '.build.lock');
+      const lockBefore = fs.existsSync(lockFile);
+
+      executeBuildSite('empresa-lock-test', 'v1', { baseDir: tempDir });
+
+      const lockAfter = fs.existsSync(lockFile);
+      const passed = (!lockBefore) && (!lockAfter);
+      results.push({
+        testNumber: 50,
+        name: 'concurrency_lock_acquired_and_released (Lock criado e liberado com sucesso)',
+        expected: 'Lock ausente antes e liberado após término',
+        actual: `beforeExists: ${lockBefore} | afterExists: ${lockAfter}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 51: concurrency_lock_blocks_simultaneous_build
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-51-'));
+    try {
+      const projDir = path.join(tempDir, 'empresa-concorrente');
+      fs.mkdirSync(projDir, { recursive: true });
+      const lockFile = path.join(projDir, '.build.lock');
+
+      // Simula lock ativo com o próprio PID do processo de teste (ativo)
+      fs.writeFileSync(lockFile, JSON.stringify({
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        projectSlug: 'empresa-concorrente',
+        version: 'v1'
+      }));
+
+      let lockErr = null;
+      try {
+        acquireBuildLock('empresa-concorrente', 'v1', { baseDir: tempDir });
+      } catch (e) {
+        lockErr = e;
+      }
+
+      const passed = (lockErr?.code === 'BUILD_LOCK_ACTIVE');
+      results.push({
+        testNumber: 51,
+        name: 'concurrency_lock_blocks_simultaneous_build (Bloqueio de concorrência ativa)',
+        expected: 'BUILD_LOCK_ACTIVE',
+        actual: `code: ${lockErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 52: concurrency_lock_recovers_stale_lock
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-52-'));
+    try {
+      const projDir = path.join(tempDir, 'empresa-stale-lock');
+      fs.mkdirSync(projDir, { recursive: true });
+      const lockFile = path.join(projDir, '.build.lock');
+
+      // Simula lock com PID inexistente/morto
+      fs.writeFileSync(lockFile, JSON.stringify({
+        pid: 99999999,
+        startedAt: new Date(Date.now() - 3600000).toISOString(),
+        projectSlug: 'empresa-stale-lock',
+        version: 'v1'
+      }));
+
+      let lockAcquired = false;
+      try {
+        acquireBuildLock('empresa-stale-lock', 'v1', { baseDir: tempDir });
+        lockAcquired = true;
+      } finally {
+        releaseBuildLock('empresa-stale-lock', { baseDir: tempDir });
+      }
+
+      const passed = lockAcquired;
+      results.push({
+        testNumber: 52,
+        name: 'concurrency_lock_recovers_stale_lock (Recuperação de lock órfão)',
+        expected: 'lockAcquired: true após remoção de PID morto',
+        actual: `acquired: ${lockAcquired}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 53: validateProductionSite_detects_valid_site
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-53-'));
+    try {
+      const prodDir = path.join(tempDir, 'empresa-valid-site', 'site-producao');
+      fs.mkdirSync(prodDir, { recursive: true });
+      const validIndex = '<!DOCTYPE html><html><head><title>Test</title></head><body><p>' + 'A'.repeat(250) + '</p></body></html>';
+      fs.writeFileSync(path.join(prodDir, 'index.html'), validIndex, 'utf8');
+      fs.writeFileSync(path.join(prodDir, 'styles.css'), 'body { font-size: 16px; } /* ' + 'B'.repeat(60) + ' */', 'utf8');
+
+      const val = validateProductionSite('empresa-valid-site', 'v1', { baseDir: tempDir });
+      const passed = (val.isValid === true) && (val.status === 'VALIDADA') && (val.checks.hasIndexHtml === true);
+      results.push({
+        testNumber: 53,
+        name: 'validateProductionSite_detects_valid_site (Validação técnica positiva)',
+        expected: 'isValid: true e status: VALIDADA',
+        actual: `isValid: ${val.isValid} | status: ${val.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 54: validateProductionSite_detects_missing_index
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-54-'));
+    try {
+      const prodDir = path.join(tempDir, 'empresa-sem-index', 'site-producao');
+      fs.mkdirSync(prodDir, { recursive: true });
+      fs.writeFileSync(path.join(prodDir, 'styles.css'), 'body { color: red; } /* ' + 'C'.repeat(50) + ' */', 'utf8');
+
+      const val = validateProductionSite('empresa-sem-index', 'v1', { baseDir: tempDir });
+      const passed = (val.isValid === false) && (val.status === 'INVALIDA') && (val.checks.hasIndexHtml === false);
+      results.push({
+        testNumber: 54,
+        name: 'validateProductionSite_detects_missing_index (Rejeição sem index.html)',
+        expected: 'isValid: false e hasIndexHtml: false',
+        actual: `isValid: ${val.isValid} | hasIndexHtml: ${val.checks.hasIndexHtml}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 55: validateProductionSite_detects_preview_elements
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-55-'));
+    try {
+      const prodDir = path.join(tempDir, 'empresa-com-preview', 'site-producao');
+      fs.mkdirSync(prodDir, { recursive: true });
+      const contaminatedHtml = '<!DOCTYPE html><html><body><aside class="control-bar">VISUALIZAR PRÉVIA</aside><p>' + 'D'.repeat(250) + '</p></body></html>';
+      fs.writeFileSync(path.join(prodDir, 'index.html'), contaminatedHtml, 'utf8');
+
+      const val = validateProductionSite('empresa-com-preview', 'v1', { baseDir: tempDir });
+      const passed = (val.isValid === false) && (val.checks.noPreviewElements === false);
+      results.push({
+        testNumber: 55,
+        name: 'validateProductionSite_detects_preview_elements (Rejeição de controles de prévia)',
+        expected: 'isValid: false e noPreviewElements: false',
+        actual: `isValid: ${val.isValid} | noPreviewElements: ${val.checks.noPreviewElements}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 56: validateProductionSite_detects_standalone_file
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-56-'));
+    try {
+      const prodDir = path.join(tempDir, 'empresa-com-standalone', 'site-producao');
+      fs.mkdirSync(prodDir, { recursive: true });
+      const validIndex = '<!DOCTYPE html><html><body><p>' + 'E'.repeat(250) + '</p></body></html>';
+      fs.writeFileSync(path.join(prodDir, 'index.html'), validIndex, 'utf8');
+      fs.writeFileSync(path.join(prodDir, 'empresa-standalone.html'), 'standalone', 'utf8');
+
+      const val = validateProductionSite('empresa-com-standalone', 'v1', { baseDir: tempDir });
+      const passed = (val.isValid === false) && (val.checks.noForbiddenFiles === false);
+      results.push({
+        testNumber: 56,
+        name: 'validateProductionSite_detects_standalone_file (Rejeição de arquivos standalone)',
+        expected: 'isValid: false e noForbiddenFiles: false',
+        actual: `isValid: ${val.isValid} | noForbiddenFiles: ${val.checks.noForbiddenFiles}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 57: buildValidation_persisted_in_manifest
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-57-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-val-persist', 'v1', { approved: true, includeScript: true });
+      const res = executeBuildSite('empresa-val-persist', 'v1', { baseDir: tempDir });
+
+      const manifestPath = path.join(tempDir, 'empresa-val-persist', 'manifest.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+      const passed = (res.buildValidation.isValid === true) &&
+                     (manifest.buildValidation?.status === 'VALIDADA') &&
+                     (manifest.buildValidation?.checks?.dirExists === true);
+      results.push({
+        testNumber: 57,
+        name: 'buildValidation_persisted_in_manifest (Persistência de buildValidation)',
+        expected: 'manifest.buildValidation.status === VALIDADA',
+        actual: `status: ${manifest.buildValidation?.status} | isValid: ${manifest.buildValidation?.isValid}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 58: assertBuildValidated_passes_for_valid
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-58-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-val-ok', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-val-ok', 'v1', { baseDir: tempDir });
+
+      const res = assertBuildValidated('empresa-val-ok', { baseDir: tempDir });
+      const passed = (res.allowed === true) && (res.status === 'VALIDADA');
+      results.push({
+        testNumber: 58,
+        name: 'assertBuildValidated_passes_for_valid (Asserção de validação aprovada)',
+        expected: 'allowed: true e status: VALIDADA',
+        actual: `allowed: ${res.allowed} | status: ${res.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 59: assertBuildValidated_blocks_when_unvalidated
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-59-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-sem-validacao', 'v1', { approved: true });
+      let valErr = null;
+      try {
+        assertBuildValidated('empresa-sem-validacao', { baseDir: tempDir });
+      } catch (e) {
+        valErr = e;
+      }
+      const passed = (valErr?.code === 'BUILD_VALIDATION_REQUIRED');
+      results.push({
+        testNumber: 59,
+        name: 'assertBuildValidated_blocks_when_unvalidated (Bloqueio sem validação)',
+        expected: 'BUILD_VALIDATION_REQUIRED',
+        actual: `code: ${valErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 60: homologation_default_is_pending
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-60-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-homo-pending', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-homo-pending', 'v1', { baseDir: tempDir });
+
+      const homo = getHomologation('empresa-homo-pending', { baseDir: tempDir });
+      const passed = (homo.approved === false) && (homo.decision === 'PENDING') && (homo.status === 'PENDENTE');
+      results.push({
+        testNumber: 60,
+        name: 'homologation_default_is_pending (Homologação padrão é PENDENTE pós-build)',
+        expected: 'approved: false, decision: PENDING, status: PENDENTE',
+        actual: `approved: ${homo.approved} | decision: ${homo.decision} | status: ${homo.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 61: homologation_cannot_be_approved_without_build_approval
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-61-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-unapproved-build', 'v1', { approved: false });
+      let homoErr = null;
+      try {
+        setHomologation('empresa-unapproved-build', true, { baseDir: tempDir, version: 'v1' });
+      } catch (e) {
+        homoErr = e;
+      }
+      const passed = (homoErr?.code === 'CANNOT_HOMOLOGATE_UNAPPROVED_BUILD');
+      results.push({
+        testNumber: 61,
+        name: 'homologation_cannot_be_approved_without_build_approval (Pré-requisito buildApproval)',
+        expected: 'CANNOT_HOMOLOGATE_UNAPPROVED_BUILD',
+        actual: `code: ${homoErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 62: homologation_cannot_be_approved_without_build_execution
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-62-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-unbuilt-site', 'v1', { approved: true });
+      let homoErr = null;
+      try {
+        setHomologation('empresa-unbuilt-site', true, { baseDir: tempDir, version: 'v1' });
+      } catch (e) {
+        homoErr = e;
+      }
+      const passed = (homoErr?.code === 'CANNOT_HOMOLOGATE_UNBUILT_SITE');
+      results.push({
+        testNumber: 62,
+        name: 'homologation_cannot_be_approved_without_build_execution (Pré-requisito buildExecution)',
+        expected: 'CANNOT_HOMOLOGATE_UNBUILT_SITE',
+        actual: `code: ${homoErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 63: homologation_cannot_be_approved_without_valid_build
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-63-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-invalid-build', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-invalid-build', 'v1', { baseDir: tempDir });
+
+      // Corrompe a validação no manifesto
+      const manifestPath = path.join(tempDir, 'empresa-invalid-build', 'manifest.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      manifest.buildValidation.status = 'INVALIDA';
+      manifest.buildValidation.isValid = false;
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+
+      let homoErr = null;
+      try {
+        setHomologation('empresa-invalid-build', true, { baseDir: tempDir, version: 'v1' });
+      } catch (e) {
+        homoErr = e;
+      }
+      const passed = (homoErr?.code === 'CANNOT_HOMOLOGATE_INVALID_BUILD');
+      results.push({
+        testNumber: 63,
+        name: 'homologation_cannot_be_approved_without_valid_build (Pré-requisito buildValidation)',
+        expected: 'CANNOT_HOMOLOGATE_INVALID_BUILD',
+        actual: `code: ${homoErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 64: homologation_approved_by_paulo_nunes
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-64-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-homo-ok', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-homo-ok', 'v1', { baseDir: tempDir });
+
+      const homoRes = setHomologation('empresa-homo-ok', true, { baseDir: tempDir, version: 'v1' });
+      const homoState = getHomologation('empresa-homo-ok', { baseDir: tempDir });
+
+      const passed = (homoRes.success === true) &&
+                     (homoRes.decision === 'APPROVED') &&
+                     (homoRes.status === 'HOMOLOGADA') &&
+                     (homoRes.decisionBy === 'Paulo Nunes') &&
+                     (homoState.approved === true);
+      results.push({
+        testNumber: 64,
+        name: 'homologation_approved_by_paulo_nunes (Homologação formal soberana)',
+        expected: 'decision: APPROVED, status: HOMOLOGADA por Paulo Nunes',
+        actual: `decision: ${homoRes.decision} | status: ${homoRes.status} | decisionBy: ${homoRes.decisionBy}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 65: homologation_rejected_by_paulo_nunes
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-65-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-homo-rej', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-homo-rej', 'v1', { baseDir: tempDir });
+
+      const homoRes = setHomologation('empresa-homo-rej', false, { baseDir: tempDir, version: 'v1' });
+      const homoState = getHomologation('empresa-homo-rej', { baseDir: tempDir });
+
+      const passed = (homoRes.success === true) &&
+                     (homoRes.decision === 'REJECTED') &&
+                     (homoRes.status === 'REJEITADA') &&
+                     (homoState.approved === false);
+      results.push({
+        testNumber: 65,
+        name: 'homologation_rejected_by_paulo_nunes (Rejeição de homologação)',
+        expected: 'decision: REJECTED, status: REJEITADA',
+        actual: `decision: ${homoRes.decision} | status: ${homoRes.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 66: homologation_chat_language_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-66-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-homo-chat', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-homo-chat', 'v1', { baseDir: tempDir });
+
+      let chatErr1 = null;
+      let chatErr2 = null;
+      try {
+        setHomologation('empresa-homo-chat', 'tá homologado', { baseDir: tempDir, version: 'v1' });
+      } catch (e) {
+        chatErr1 = e;
+      }
+      try {
+        setHomologation('empresa-homo-chat', 'sim, aprovo', { baseDir: tempDir, version: 'v1' });
+      } catch (e) {
+        chatErr2 = e;
+      }
+
+      const passed = Boolean(chatErr1) && Boolean(chatErr2);
+      results.push({
+        testNumber: 66,
+        name: 'homologation_chat_language_rejected (Bloqueio de linguagem natural)',
+        expected: 'Exceção para strings em vez de booleano estrito',
+        actual: `chatErr1: ${Boolean(chatErr1)} | chatErr2: ${Boolean(chatErr2)}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 67: homologation_isolation_between_slugs
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-67-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-homo-a', 'v1', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-homo-b', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-homo-a', 'v1', { baseDir: tempDir });
+      executeBuildSite('empresa-homo-b', 'v1', { baseDir: tempDir });
+
+      setHomologation('empresa-homo-a', true, { baseDir: tempDir, version: 'v1' });
+
+      const homoA = getHomologation('empresa-homo-a', { baseDir: tempDir });
+      const homoB = getHomologation('empresa-homo-b', { baseDir: tempDir });
+
+      const passed = (homoA.approved === true) && (homoB.approved === false) && (homoB.decision === 'PENDING');
+      results.push({
+        testNumber: 67,
+        name: 'homologation_isolation_between_slugs (Isolamento entre oportunidades)',
+        expected: 'empresa A aprovada, empresa B pendente',
+        actual: `homoA: ${homoA.approved} | homoB: ${homoB.approved} (${homoB.decision})`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 68: assertSiteHomologated_blocks_pending
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-68-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-assert-pending', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-assert-pending', 'v1', { baseDir: tempDir });
+
+      let homoErr = null;
+      try {
+        assertSiteHomologated('empresa-assert-pending', { baseDir: tempDir });
+      } catch (e) {
+        homoErr = e;
+      }
+
+      const passed = (homoErr?.code === 'SITE_HOMOLOGATION_REQUIRED');
+      results.push({
+        testNumber: 68,
+        name: 'assertSiteHomologated_blocks_pending (Bloqueio sem homologação prévia)',
+        expected: 'SITE_HOMOLOGATION_REQUIRED',
+        actual: `code: ${homoErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 69: assertSiteHomologated_passes_when_approved
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-69-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-assert-ok', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-assert-ok', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-assert-ok', true, { baseDir: tempDir, version: 'v1' });
+
+      const assertRes = assertSiteHomologated('empresa-assert-ok', { baseDir: tempDir });
+      const passed = (assertRes.allowed === true) && (assertRes.status === 'HOMOLOGADA');
+      results.push({
+        testNumber: 69,
+        name: 'assertSiteHomologated_passes_when_approved (Asserção positiva de homologação)',
+        expected: 'allowed: true e status: HOMOLOGADA',
+        actual: `allowed: ${assertRes.allowed} | status: ${assertRes.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 70: panel_renders_all_5_sections
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-70-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-panel-5-sections', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-panel-5-sections', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-panel-5-sections', true, { baseDir: tempDir, version: 'v1' });
+
+      const panelRes = generateApprovalPanel('empresa-panel-5-sections', 'v1', { baseDir: tempDir, openInEditor: false });
+      const md = panelRes.content;
+
+      const hasSec1 = md.includes('## 🏗️ APROVAÇÃO DA CONSTRUÇÃO DO SITE');
+      const hasSec2 = md.includes('## 🔨 EXECUÇÃO DA CONSTRUÇÃO DO SITE');
+      const hasSec3 = md.includes('## 🔎 VALIDAÇÃO DO BUILD');
+      const hasSec4 = md.includes('## ✅ HOMOLOGAÇÃO DO SITE DE PRODUÇÃO');
+      const hasSec5 = md.includes('## 🌐 SITE DE PRODUÇÃO');
+
+      const passed = hasSec1 && hasSec2 && hasSec3 && hasSec4 && hasSec5;
+      results.push({
+        testNumber: 70,
+        name: 'panel_renders_all_5_sections (Painel com as 5 seções operacionais distintas)',
+        expected: 'Presença das seções 1, 2, 3, 4 e 5 no markdown gerado',
+        actual: `sec1: ${hasSec1} | sec2: ${hasSec2} | sec3: ${hasSec3} | sec4: ${hasSec4} | sec5: ${hasSec5}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // ==========================================================================
+  // TESTES DE ISOLAMENTO POR VERSÃO E INVALIDAÇÃO DE HOMOLOGAÇÃO (Fase 3 - Correções)
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 71 (TESTE A): unhomologated_new_version_blocked
+  // Construir v2 -> validar -> homologar v2 -> construir v3 -> assertSiteHomologated(v3) => BLOQUEADO
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-71-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-71', 'v2', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-test-71', 'v3', { approved: true, includeScript: true });
+
+      executeBuildSite('empresa-test-71', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-71', true, { baseDir: tempDir, version: 'v2' });
+
+      // Constrói v3 posteriormente
+      executeBuildSite('empresa-test-71', 'v3', { baseDir: tempDir });
+
+      let blockedErr = null;
+      try {
+        assertSiteHomologated('empresa-test-71', 'v3', { baseDir: tempDir });
+      } catch (e) {
+        blockedErr = e;
+      }
+
+      const passed = (blockedErr?.code === 'SITE_HOMOLOGATION_REQUIRED' || blockedErr?.code === 'HOMOLOGATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 71,
+        name: 'unhomologated_new_version_blocked [TESTE A] (v3 bloqueada após build sem nova homologação)',
+        expected: 'SITE_HOMOLOGATION_REQUIRED ou HOMOLOGATION_VERSION_MISMATCH',
+        actual: `code: ${blockedErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 72 (TESTE B): setHomologation_blocks_version_mismatch
+  // Construir v2 -> homologar v2 -> tentar homologar v3 sem construir v3 => BLOQUEADO
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-72-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-72', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-72', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-72', true, { baseDir: tempDir, version: 'v2' });
+
+      let mismatchErr = null;
+      try {
+        setHomologation('empresa-test-72', true, { baseDir: tempDir, version: 'v3' });
+      } catch (e) {
+        mismatchErr = e;
+      }
+
+      const passed = (mismatchErr?.code === 'HOMOLOGATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 72,
+        name: 'setHomologation_blocks_version_mismatch [TESTE B] (Bloqueio de homologação de v3 não construída)',
+        expected: 'HOMOLOGATION_VERSION_MISMATCH',
+        actual: `code: ${mismatchErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 73 (TESTE C): rebuild_invalidates_homologation_to_pending
+  // Construir v2 -> homologar v2 -> rebuild de v2 -> verificar manifest.siteHomologation => PENDENTE
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-73-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-73', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-73', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-73', true, { baseDir: tempDir, version: 'v2' });
+
+      const homoBefore = getHomologation('empresa-test-73', { baseDir: tempDir });
+
+      // Rebuild de v2
+      executeBuildSite('empresa-test-73', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-test-73', 'manifest.json'), 'utf8'));
+      const homoAfter = manifestRaw.siteHomologation;
+
+      const passed = (homoBefore.status === 'HOMOLOGADA') &&
+                     (homoAfter.status === 'PENDENTE') &&
+                     (homoAfter.approved === false) &&
+                     (homoAfter.decision === 'PENDING');
+      results.push({
+        testNumber: 73,
+        name: 'rebuild_invalidates_homologation_to_pending [TESTE C] (Rebuild reseta homologação para PENDENTE)',
+        expected: 'status anterior HOMOLOGADA e status pós-rebuild PENDENTE',
+        actual: `before: ${homoBefore.status} | after: ${homoAfter?.status} | approved: ${homoAfter?.approved}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 74 (TESTE D): assertSiteHomologated_blocks_after_rebuild_until_rehomologated
+  // Construir v2 -> homologar v2 -> alterar/reconstruir v2 -> assertSiteHomologated(v2) => BLOQUEADO até nova homologação
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-74-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-74', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-74', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-74', true, { baseDir: tempDir, version: 'v2' });
+
+      // Rebuild v2
+      executeBuildSite('empresa-test-74', 'v2', { baseDir: tempDir });
+
+      let blockedErr = null;
+      try {
+        assertSiteHomologated('empresa-test-74', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        blockedErr = e;
+      }
+
+      // Nova deliberação formal homologando v2
+      setHomologation('empresa-test-74', true, { baseDir: tempDir, version: 'v2' });
+      const allowedRes = assertSiteHomologated('empresa-test-74', 'v2', { baseDir: tempDir });
+
+      const passed = (blockedErr?.code === 'SITE_HOMOLOGATION_REQUIRED') &&
+                     (allowedRes.allowed === true);
+      results.push({
+        testNumber: 74,
+        name: 'assertSiteHomologated_blocks_after_rebuild_until_rehomologated [TESTE D] (Bloqueado pós-rebuild até re-homologação)',
+        expected: 'Bloqueado com SITE_HOMOLOGATION_REQUIRED e liberado após nova homologação',
+        actual: `blockedCode: ${blockedErr?.code} | afterNewHomoAllowed: ${allowedRes?.allowed}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 75 (TESTE E): old_homologation_does_not_authorize_new_version
+  // Construir v2 -> homologar v2 -> construir v3 -> verificar que homologação antiga não autoriza v3
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-75-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-75', 'v2', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-test-75', 'v3', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-75', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-75', true, { baseDir: tempDir, version: 'v2' });
+
+      executeBuildSite('empresa-test-75', 'v3', { baseDir: tempDir });
+
+      let errV3 = null;
+      try {
+        assertSiteHomologated('empresa-test-75', 'v3', { baseDir: tempDir });
+      } catch (e) {
+        errV3 = e;
+      }
+
+      let errWithoutVersion = null;
+      try {
+        assertSiteHomologated('empresa-test-75', { baseDir: tempDir });
+      } catch (e) {
+        errWithoutVersion = e;
+      }
+
+      const passed = Boolean(errV3) && Boolean(errWithoutVersion);
+      results.push({
+        testNumber: 75,
+        name: 'old_homologation_does_not_authorize_new_version [TESTE E] (Homologação de v2 não autoriza v3)',
+        expected: 'Bloqueio estrito para v3 com ou sem versão passada',
+        actual: `errV3: ${errV3?.code} | errNoVer: ${errWithoutVersion?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 76 (TESTE F): temporal_protection_blocks_stale_homologation
+  // Verificar proteção temporal: homologation.decisionAt anterior a buildExecution.executedAt => BLOQUEADO
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-76-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-76', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-76', 'v2', { baseDir: tempDir });
+
+      // Simula uma homologação adulterada com timestamp anterior ao build
+      const manifestPath = path.join(tempDir, 'empresa-test-76', 'manifest.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      manifest.siteHomologation = {
+        approved: true,
+        decision: 'APPROVED',
+        status: 'HOMOLOGADA',
+        decisionBy: 'Paulo Nunes',
+        decisionAt: '2026-01-01T00:00:00.000Z', // Data antiga, anterior à execução do build
+        projectSlug: 'empresa-test-76',
+        version: 'v2',
+        notes: 'Simulação de homologação obsoleta'
+      };
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+
+      let staleErr = null;
+      try {
+        assertSiteHomologated('empresa-test-76', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        staleErr = e;
+      }
+
+      const passed = (staleErr?.code === 'HOMOLOGATION_STALE');
+      results.push({
+        testNumber: 76,
+        name: 'temporal_protection_blocks_stale_homologation [TESTE F] (Proteção temporal detecta HOMOLOGATION_STALE)',
+        expected: 'HOMOLOGATION_STALE',
+        actual: `code: ${staleErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 77 (TESTE G): valid_homologation_same_version_passes
+  // Verificar que homologação válida da mesma versão, sem rebuild posterior, continua autorizada => PERMITIDO
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-77-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-77', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-77', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-77', true, { baseDir: tempDir, version: 'v2' });
+
+      const res = assertSiteHomologated('empresa-test-77', 'v2', { baseDir: tempDir });
+
+      const passed = (res.allowed === true) && (res.status === 'HOMOLOGADA') && (res.version === 'v2');
+      results.push({
+        testNumber: 77,
+        name: 'valid_homologation_same_version_passes [TESTE G] (Homologação íntegra da versão autorizada)',
+        expected: 'allowed: true, status: HOMOLOGADA e version: v2',
+        actual: `allowed: ${res.allowed} | status: ${res.status} | version: ${res.version}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 78 (TESTE H): isolation_between_project_slugs_preserved
+  // Verificar isolamento entre projectSlugs continua funcionando
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-78-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-h-1', 'v2', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-h-2', 'v2', { approved: true, includeScript: true });
+
+      executeBuildSite('empresa-h-1', 'v2', { baseDir: tempDir });
+      executeBuildSite('empresa-h-2', 'v2', { baseDir: tempDir });
+
+      setHomologation('empresa-h-1', true, { baseDir: tempDir, version: 'v2' });
+
+      const res1 = assertSiteHomologated('empresa-h-1', 'v2', { baseDir: tempDir });
+
+      let res2Err = null;
+      try {
+        assertSiteHomologated('empresa-h-2', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        res2Err = e;
+      }
+
+      const passed = (res1.allowed === true) && (res2Err?.code === 'SITE_HOMOLOGATION_REQUIRED');
+      results.push({
+        testNumber: 78,
+        name: 'isolation_between_project_slugs_preserved [TESTE H] (Isolamento entre empresas preservado)',
+        expected: 'empresa-h-1 autorizada e empresa-h-2 bloqueada',
+        actual: `res1Allowed: ${res1.allowed} | res2Code: ${res2Err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 79 (TESTE I): buildApproval_intact_after_homologation_invalidation
+  // Verificar que buildApproval permanece intacto após invalidação da homologação
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-79-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-79', 'v2', {
+        approved: true,
+        includeScript: true,
+        buildApproval: {
+          approved: true,
+          decision: 'APPROVED',
+          decisionBy: 'Paulo Nunes',
+          decisionAt: '2026-09-05T08:00:00.000Z'
+        }
+      });
+      executeBuildSite('empresa-test-79', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-79', true, { baseDir: tempDir, version: 'v2' });
+
+      // Rebuild que invalida homologação
+      executeBuildSite('empresa-test-79', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-test-79', 'manifest.json'), 'utf8'));
+      const app = manifestRaw.buildApproval;
+
+      const passed = (app.approved === true) &&
+                     (app.decision === 'APPROVED') &&
+                     (app.decisionBy === 'Paulo Nunes') &&
+                     (app.decisionAt === '2026-09-05T08:00:00.000Z');
+      results.push({
+        testNumber: 79,
+        name: 'buildApproval_intact_after_homologation_invalidation [TESTE I] (buildApproval preservado intacto)',
+        expected: 'approved: true, decision: APPROVED, decisionBy: Paulo Nunes',
+        actual: `approved: ${app?.approved} | decision: ${app?.decision} | decisionBy: ${app?.decisionBy}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 80 (TESTE J): approvalGate_intact_after_homologation_invalidation
+  // Verificar que approvalGate permanece intacto
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-80-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-80', 'v2', { approved: true, includeScript: true });
+      const manifestPath = path.join(tempDir, 'empresa-test-80', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.approvalGate = {
+        decision: 'APROVAR',
+        decisionBy: 'Paulo Nunes',
+        decisionAt: '2026-09-05T08:00:00.000Z'
+      };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      executeBuildSite('empresa-test-80', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-80', true, { baseDir: tempDir, version: 'v2' });
+      executeBuildSite('empresa-test-80', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const gate = manifestRaw.approvalGate;
+
+      const passed = (gate.decision === 'APROVAR') && (gate.decisionBy === 'Paulo Nunes');
+      results.push({
+        testNumber: 80,
+        name: 'approvalGate_intact_after_homologation_invalidation [TESTE J] (approvalGate comercial intacto)',
+        expected: 'decision: APROVAR e decisionBy: Paulo Nunes',
+        actual: `decision: ${gate?.decision} | decisionBy: ${gate?.decisionBy}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 81 (TESTE K): buildExecution_intact_and_updated_after_rebuild
+  // Verificar que buildExecution permanece intacto e atualizado
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-81-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-81', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-81', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-81', true, { baseDir: tempDir, version: 'v2' });
+      executeBuildSite('empresa-test-81', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-test-81', 'manifest.json'), 'utf8'));
+      const exec = manifestRaw.buildExecution;
+
+      const passed = (exec.status === 'CONCLUIDA') && (exec.version === 'v2') && Boolean(exec.executedAt);
+      results.push({
+        testNumber: 81,
+        name: 'buildExecution_intact_and_updated_after_rebuild [TESTE K] (buildExecution atualizado e íntegro)',
+        expected: 'status: CONCLUIDA, version: v2, executedAt presente',
+        actual: `status: ${exec?.status} | version: ${exec?.version} | hasTimestamp: ${Boolean(exec?.executedAt)}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 82 (TESTE L): buildValidation_intact_and_valid_after_rebuild
+  // Verificar que buildValidation permanece intacto e válido
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-build-82-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-test-82', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-test-82', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-test-82', true, { baseDir: tempDir, version: 'v2' });
+      executeBuildSite('empresa-test-82', 'v2', { baseDir: tempDir });
+
+      const manifestRaw = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-test-82', 'manifest.json'), 'utf8'));
+      const val = manifestRaw.buildValidation;
+
+      const passed = (val.status === 'VALIDADA') && (val.isValid === true);
+      results.push({
+        testNumber: 82,
+        name: 'buildValidation_intact_and_valid_after_rebuild [TESTE L] (buildValidation válido pós-rebuild)',
+        expected: 'status: VALIDADA e isValid: true',
+        actual: `status: ${val?.status} | isValid: ${val?.isValid}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 83 (TESTE M): production_send_remains_unaltered
+  // Verificar que --production-send permanece inalterado
+  // --------------------------------------------------------------------------
+  {
+    const gateRes = validateEmailGate('castlink-world', 'v2');
+    const passed = (gateRes.allowed === true) && (gateRes.status === 'APPROVED') && (gateRes.dryRun === true);
+    results.push({
+      testNumber: 83,
+      name: 'production_send_remains_unaltered [TESTE M] (Gate comercial e dry-run 100% inalterados)',
+      expected: 'allowed: true, status: APPROVED e dryRun: true',
+      actual: `allowed: ${gateRes.allowed} | status: ${gateRes.status} | dryRun: ${gateRes.dryRun}`,
       passed
     });
   }

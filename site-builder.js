@@ -403,6 +403,137 @@ function buildProductionSite(projectSlug, version, options = {}) {
   }
 }
 
+/**
+ * Valida a integridade física e estrutural dos artefatos no diretório canônico de produção.
+ * Realiza checagem determinística de arquivos essenciais, tamanhos mínimos, estrutura HTML,
+ * ausência de elementos de teste e garantia de caminho canônico estrito.
+ */
+function validateProductionSite(projectSlug, version, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const cleanVersion = validateVersion(version || 'v2');
+  const canonicalDestDir = resolveCanonicalDestination(cleanSlug, options);
+
+  if (!fs.existsSync(canonicalDestDir)) {
+    return {
+      isValid: false,
+      status: 'INVALIDA',
+      reason: 'PRODUCTION_DIR_NOT_FOUND',
+      message: `Diretório de produção não encontrado em: ${canonicalDestDir}`,
+      projectSlug: cleanSlug,
+      version: cleanVersion,
+      canonicalPath: canonicalDestDir,
+      validatedAt: new Date().toISOString(),
+      checks: {
+        dirExists: false,
+        hasIndexHtml: false,
+        hasValidIndexHtmlSize: false,
+        hasValidHtmlStructure: false,
+        noPreviewElements: false,
+        hasStylesCss: false,
+        hasScriptJs: false,
+        noForbiddenFiles: false,
+        noPreviewsGarimpoPath: true,
+        isCanonicalPath: true
+      },
+      files: []
+    };
+  }
+
+  const checks = {
+    dirExists: true,
+    hasIndexHtml: false,
+    hasValidIndexHtmlSize: false,
+    hasValidHtmlStructure: false,
+    noPreviewElements: false,
+    hasStylesCss: false,
+    hasScriptJs: false,
+    noForbiddenFiles: true,
+    noPreviewsGarimpoPath: true,
+    isCanonicalPath: true
+  };
+
+  // 1. Verificação de segurança de caminhos
+  const lowerDest = path.resolve(canonicalDestDir).toLowerCase();
+  if (lowerDest.includes(FORBIDDEN_PATH_SUBSTRING)) {
+    checks.noPreviewsGarimpoPath = false;
+  }
+  const expectedSuffix = path.join(cleanSlug, 'site-producao').toLowerCase();
+  if (!lowerDest.endsWith(expectedSuffix)) {
+    checks.isCanonicalPath = false;
+  }
+
+  // 2. Validação de index.html
+  const indexPath = path.join(canonicalDestDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    checks.hasIndexHtml = true;
+    const stat = fs.statSync(indexPath);
+    if (stat.size >= 200) {
+      checks.hasValidIndexHtmlSize = true;
+    }
+    const content = fs.readFileSync(indexPath, 'utf8');
+    if (content.includes('<html') && content.includes('</html>') && content.includes('<body')) {
+      checks.hasValidHtmlStructure = true;
+    }
+    if (!content.includes('control-bar') || !content.includes('VISUALIZAR PRÉVIA')) {
+      checks.noPreviewElements = true;
+    }
+  }
+
+  // 3. Validação de styles.css (se presente, deve possuir tamanho mínimo)
+  const stylesPath = path.join(canonicalDestDir, 'styles.css');
+  if (fs.existsSync(stylesPath)) {
+    const stat = fs.statSync(stylesPath);
+    if (stat.size >= 50) {
+      checks.hasStylesCss = true;
+    }
+  } else {
+    checks.hasStylesCss = true; // Opcional se styles forem inline
+  }
+
+  // 4. Validação de script.js (se presente, não pode estar vazio)
+  const scriptPath = path.join(canonicalDestDir, 'script.js');
+  if (fs.existsSync(scriptPath)) {
+    const stat = fs.statSync(scriptPath);
+    if (stat.size > 0) {
+      checks.hasScriptJs = true;
+    }
+  } else {
+    checks.hasScriptJs = true; // Opcional se o protótipo não incluir JS externo
+  }
+
+  // 5. Validação de ausência de arquivos proibidos (standalone e manifest)
+  const entries = fs.readdirSync(canonicalDestDir);
+  for (const entry of entries) {
+    const lowerEntry = entry.toLowerCase();
+    if (lowerEntry.endsWith('-standalone.html') || lowerEntry === 'manifest.json') {
+      checks.noForbiddenFiles = false;
+      break;
+    }
+  }
+
+  const isValid = checks.dirExists &&
+    checks.hasIndexHtml &&
+    checks.hasValidIndexHtmlSize &&
+    checks.hasValidHtmlStructure &&
+    checks.noPreviewElements &&
+    checks.hasStylesCss &&
+    checks.hasScriptJs &&
+    checks.noForbiddenFiles &&
+    checks.noPreviewsGarimpoPath &&
+    checks.isCanonicalPath;
+
+  return {
+    isValid,
+    status: isValid ? 'VALIDADA' : 'INVALIDA',
+    projectSlug: cleanSlug,
+    version: cleanVersion,
+    validatedAt: new Date().toISOString(),
+    canonicalPath: canonicalDestDir,
+    checks,
+    files: entries
+  };
+}
+
 module.exports = {
   DEFAULT_GARIMPO_DIR,
   FORBIDDEN_PATH_SUBSTRING,
@@ -413,6 +544,7 @@ module.exports = {
   resolveCanonicalDestination,
   sanitizeHtml,
   validateBuiltFiles,
+  validateProductionSite,
   buildProductionSite,
   buildSite: buildProductionSite
 };

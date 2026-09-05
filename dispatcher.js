@@ -31,6 +31,7 @@ const path = require('path');
 const { sendViaGmailApi } = require('./gmail-client');
 const {
   buildProductionSite,
+  validateProductionSite,
   validateProjectSlug,
   validateVersion,
   resolveCanonicalDestination,
@@ -51,6 +52,11 @@ const BUILD_STATUS_PENDING = 'PENDENTE';
 const BUILD_STATUS_APPROVED = 'APROVADA';
 const BUILD_STATUS_REJECTED = 'REJEITADA';
 const VALID_BUILD_STATUSES = [BUILD_STATUS_PENDING, BUILD_STATUS_APPROVED, BUILD_STATUS_REJECTED];
+
+const HOMOLOGATION_DECISION_PENDING = 'PENDING';
+const HOMOLOGATION_DECISION_APPROVED = 'APPROVED';
+const HOMOLOGATION_DECISION_REJECTED = 'REJECTED';
+const VALID_HOMOLOGATION_DECISIONS = [HOMOLOGATION_DECISION_PENDING, HOMOLOGATION_DECISION_APPROVED, HOMOLOGATION_DECISION_REJECTED];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -773,19 +779,113 @@ function assertBuildApproved(projectSlug, options = {}) {
 }
 
 /**
- * Executa a construção controlada do site de produção (Fase 2).
+ * Adquire lock exclusivo para o build da oportunidade.
+ * Utiliza arquivo físico .build.lock no diretório do projeto com verificação de processo ativo.
+ */
+function acquireBuildLock(projectSlug, version, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const cleanVersion = validateVersion(version || 'v2');
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+
+  if (!fs.existsSync(projectDir)) {
+    fs.mkdirSync(projectDir, { recursive: true });
+  }
+
+  const lockPath = path.join(projectDir, '.build.lock');
+
+  if (fs.existsSync(lockPath)) {
+    let existingLock = null;
+    try {
+      existingLock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    } catch (e) {
+      existingLock = null;
+    }
+
+    if (existingLock && existingLock.pid) {
+      let isAlive = false;
+      try {
+        isAlive = process.kill(existingLock.pid, 0);
+      } catch (e) {
+        isAlive = (e.code === 'EPERM');
+      }
+
+      if (isAlive) {
+        const err = new Error(`[LOCK ATIVO] O processo PID ${existingLock.pid} já está executando build para '${cleanSlug}' desde ${existingLock.startedAt}.`);
+        err.code = 'BUILD_LOCK_ACTIVE';
+        err.projectSlug = cleanSlug;
+        err.lockPid = existingLock.pid;
+        throw err;
+      }
+    }
+
+    // Lock órfão de processo morto: remove com segurança
+    try {
+      fs.unlinkSync(lockPath);
+    } catch (e) {}
+  }
+
+  const lockData = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+    projectSlug: cleanSlug,
+    version: cleanVersion
+  };
+
+  try {
+    fs.writeFileSync(lockPath, JSON.stringify(lockData, null, 2), { flag: 'wx' });
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      const lockErr = new Error(`[LOCK CONCORRENTE] Conflito ao adquirir lock para '${cleanSlug}'.`);
+      lockErr.code = 'BUILD_LOCK_ACTIVE';
+      throw lockErr;
+    }
+    throw err;
+  }
+
+  return { lockPath, lockData };
+}
+
+/**
+ * Libera o lock exclusivo após o término do build.
+ */
+function releaseBuildLock(projectSlug, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const lockPath = path.join(baseDir, cleanSlug, '.build.lock');
+
+  if (fs.existsSync(lockPath)) {
+    try {
+      fs.unlinkSync(lockPath);
+    } catch (e) {}
+  }
+}
+
+/**
+ * Executa a construção controlada e orquestrada do site de produção (Fases 2 e 3).
  *
- * ORDEM DE OPERAÇÃO OBRIGATÓRIA (BUILD GATE):
- * 1. Validar projectSlug e version.
+ * ORDEM DE OPERAÇÃO OBRIGATÓRIA (GOVERNANÇA FASE 3):
+ * 1. Validar projectSlug e version (exige versão explícita).
  * 2. Carregar manifest.json e verificar isolamento estrito de slug.
  * 3. Chamar assertBuildApproved(cleanSlug) -> Bloqueio determinístico se não aprovado formalmente.
- * 4. Executar buildProductionSite() no destino canônico exclusivo.
- * 5. Gravar buildExecution em manifest.json (NUNCA altera buildApproval).
- * 6. Regenerar PAINEL_APROVACAO.md com seção de execução.
+ * 4. Adquirir lock determinístico de concorrência.
+ * 5. Executar buildProductionSite() no destino canônico exclusivo.
+ * 6. Executar validateProductionSite() validando artefatos gerados.
+ * 7. Gravar buildExecution e buildValidation em manifest.json (NUNCA altera buildApproval).
+ * 8. Regenerar PAINEL_APROVACAO.md com todas as seções atualizadas.
+ * 9. Liberar lock de concorrência.
  */
 function executeBuildSite(projectSlug, version, options = {}) {
   const cleanSlug = validateProjectSlug(projectSlug);
-  const cleanVersion = validateVersion(version || 'v2');
+  if (!version || typeof version !== 'string' || !version.trim()) {
+    const err = new Error(`[VERSÃO OBRIGATÓRIA] É obrigatório especificar explicitamente a versão para a construção do site (ex: v2).`);
+    err.code = 'VERSION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+  const cleanVersion = validateVersion(version);
 
   const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
   const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
@@ -820,31 +920,391 @@ function executeBuildSite(projectSlug, version, options = {}) {
   }
 
   // PASSO 3: BUILD GATE OBRIGATÓRIO (assertBuildApproved)
-  // Se buildApproval não for APPROVED por Paulo Nunes, lança BUILD_APPROVAL_REQUIRED
   assertBuildApproved(cleanSlug, { ...options, manifestOverride: manifest });
 
-  // PASSO 4: CONSTRUÇÃO CONTROLADA E ATÔMICA
-  const buildResult = buildProductionSite(cleanSlug, cleanVersion, {
-    ...options,
-    manifestOverride: manifest,
-    baseDir
-  });
+  // PASSO 4: AQUISIÇÃO DO LOCK DETERMINÍSTICO DE CONCORRÊNCIA
+  let lockAcquired = false;
+  if (options.skipLock !== true && !options.manifestOverride) {
+    acquireBuildLock(cleanSlug, cleanVersion, { baseDir });
+    lockAcquired = true;
+  }
 
-  // PASSO 5: REGISTRO SEPARADO DE buildExecution (NUNCA altera buildApproval)
-  manifest.buildExecution = {
-    status: 'CONCLUIDA',
+  try {
+    // PASSO 5: CONSTRUÇÃO CONTROLADA E ATÔMICA
+    const buildResult = buildProductionSite(cleanSlug, cleanVersion, {
+      ...options,
+      manifestOverride: manifest,
+      baseDir
+    });
+
+    // PASSO 6: VALIDAÇÃO TÉCNICA DETERMINÍSTICA DOS ARTEFATOS PRODUZIDOS
+    const validationResult = validateProductionSite(cleanSlug, cleanVersion, {
+      ...options,
+      baseDir
+    });
+
+    // PASSO 7: REGISTRO SEPARADO DE buildExecution E buildValidation
+    manifest.buildExecution = {
+      status: validationResult.isValid ? 'CONCLUIDA' : 'FALHOU',
+      projectSlug: cleanSlug,
+      version: cleanVersion,
+      executedAt: buildResult.executedAt || new Date().toISOString(),
+      canonicalDestination: buildResult.canonicalPath,
+      files: buildResult.files,
+      filesCount: buildResult.files ? buildResult.files.length : 0
+    };
+
+    manifest.buildValidation = validationResult;
+
+    // INVALIDAÇÃO DETERMINÍSTICA DE HOMOLOGAÇÃO:
+    // Qualquer novo build ou rebuild invalida a homologação anterior, retornando-a a PENDENTE.
+    manifest.siteHomologation = {
+      approved: false,
+      decision: HOMOLOGATION_DECISION_PENDING,
+      status: 'PENDENTE',
+      decisionBy: null,
+      decisionAt: null,
+      projectSlug: cleanSlug,
+      version: cleanVersion,
+      notes: null
+    };
+
+    if (!options.manifestOverride && options.save !== false) {
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+    }
+
+    if (!validationResult.isValid) {
+      const err = new Error(`[VALIDAÇÃO PÓS-BUILD FALHOU] Os arquivos gerados para '${cleanSlug}' falharam na validação técnica.`);
+      err.code = 'POST_BUILD_VALIDATION_FAILED';
+      err.projectSlug = cleanSlug;
+      err.validation = validationResult;
+      throw err;
+    }
+
+    // PASSO 8: REGENERAR PAINEL_APROVACAO.MD
+    if (options.updatePanel !== false && !options.manifestOverride && fs.existsSync(projectDir)) {
+      generateApprovalPanel(cleanSlug, cleanVersion, {
+        ...options,
+        openInEditor: options.openInEditor !== undefined ? options.openInEditor : false
+      });
+    }
+
+    return {
+      success: true,
+      projectSlug: cleanSlug,
+      version: cleanVersion,
+      buildExecution: manifest.buildExecution,
+      buildValidation: validationResult,
+      buildResult
+    };
+  } finally {
+    if (lockAcquired) {
+      releaseBuildLock(cleanSlug, { baseDir });
+    }
+  }
+}
+
+/**
+ * Consulta o estado da validação técnica do build.
+ */
+function getBuildValidation(projectSlug, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      return { isValid: false, status: 'PENDENTE', projectSlug: cleanSlug };
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      return { isValid: false, status: 'PENDENTE', projectSlug: cleanSlug };
+    }
+  }
+
+  return manifest.buildValidation || { isValid: false, status: 'PENDENTE', projectSlug: cleanSlug };
+}
+
+/**
+ * Assegura que o build foi tecnicamente validado com sucesso.
+ */
+function assertBuildValidated(projectSlug, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const validation = getBuildValidation(cleanSlug, options);
+
+  if (!validation || !validation.isValid || validation.status !== 'VALIDADA') {
+    const err = new Error(`[VALIDAÇÃO NECESSÁRIA] O build para '${cleanSlug}' não possui validação técnica aprovada.`);
+    err.code = 'BUILD_VALIDATION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    err.status = validation ? validation.status : 'PENDENTE';
+    throw err;
+  }
+
+  return {
+    allowed: true,
     projectSlug: cleanSlug,
-    version: cleanVersion,
-    executedAt: buildResult.executedAt || new Date().toISOString()
+    status: validation.status,
+    isValid: validation.isValid,
+    validatedAt: validation.validatedAt
   };
+}
+
+/**
+ * Valida a estrutura formal de siteHomologation.
+ */
+function validateHomologation(manifest) {
+  if (!manifest || typeof manifest !== 'object') {
+    return {
+      valid: true,
+      approved: false,
+      decision: HOMOLOGATION_DECISION_PENDING,
+      status: 'PENDENTE',
+      decisionBy: null,
+      decisionAt: null,
+      notes: null
+    };
+  }
+
+  const homo = manifest.siteHomologation;
+  if (!homo || typeof homo !== 'object') {
+    return {
+      valid: true,
+      approved: false,
+      decision: HOMOLOGATION_DECISION_PENDING,
+      status: 'PENDENTE',
+      decisionBy: null,
+      decisionAt: null,
+      notes: null
+    };
+  }
+
+  const decision = (typeof homo.decision === 'string') ? homo.decision.toUpperCase().trim() : '';
+  if (!VALID_HOMOLOGATION_DECISIONS.includes(decision)) {
+    return {
+      valid: false,
+      approved: false,
+      decision: HOMOLOGATION_DECISION_PENDING,
+      status: 'PENDENTE',
+      reason: `Decisão de homologação desconhecida: '${homo.decision}'`
+    };
+  }
+
+  if (decision === HOMOLOGATION_DECISION_APPROVED) {
+    if (homo.approved !== true) {
+      return {
+        valid: false,
+        approved: false,
+        decision,
+        status: 'PENDENTE',
+        reason: "Decisão APPROVED requer approved === true."
+      };
+    }
+    if (homo.decisionBy !== REQUIRED_APPROVER) {
+      return {
+        valid: false,
+        approved: false,
+        decision,
+        status: 'PENDENTE',
+        reason: `Homologação requer aprovador oficial '${REQUIRED_APPROVER}'.`
+      };
+    }
+    if (!homo.decisionAt || typeof homo.decisionAt !== 'string') {
+      return {
+        valid: false,
+        approved: false,
+        decision,
+        status: 'PENDENTE',
+        reason: "Homologação requer timestamp 'decisionAt'."
+      };
+    }
+    return {
+      valid: true,
+      approved: true,
+      decision: HOMOLOGATION_DECISION_APPROVED,
+      status: 'HOMOLOGADA',
+      decisionBy: homo.decisionBy,
+      decisionAt: homo.decisionAt,
+      notes: homo.notes || null,
+      projectSlug: homo.projectSlug,
+      version: homo.version
+    };
+  }
+
+  if (decision === HOMOLOGATION_DECISION_REJECTED) {
+    return {
+      valid: true,
+      approved: false,
+      decision: HOMOLOGATION_DECISION_REJECTED,
+      status: 'REJEITADA',
+      decisionBy: homo.decisionBy || REQUIRED_APPROVER,
+      decisionAt: homo.decisionAt || null,
+      notes: homo.notes || null,
+      projectSlug: homo.projectSlug,
+      version: homo.version
+    };
+  }
+
+  return {
+    valid: true,
+    approved: false,
+    decision: HOMOLOGATION_DECISION_PENDING,
+    status: 'PENDENTE',
+    decisionBy: null,
+    decisionAt: null,
+    notes: null
+  };
+}
+
+/**
+ * Lê o estado de homologação de uma oportunidade.
+ */
+function getHomologation(projectSlug, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      return {
+        approved: false,
+        decision: HOMOLOGATION_DECISION_PENDING,
+        status: 'PENDENTE',
+        valid: true,
+        decisionBy: null,
+        decisionAt: null,
+        projectSlug: cleanSlug
+      };
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      return {
+        approved: false,
+        decision: HOMOLOGATION_DECISION_PENDING,
+        status: 'PENDENTE',
+        valid: false,
+        reason: `Falha ao ler manifest.json: ${e.message}`,
+        projectSlug: cleanSlug
+      };
+    }
+  }
+
+  const validation = validateHomologation(manifest);
+  return { ...validation, projectSlug: cleanSlug };
+}
+
+/**
+ * Registra a homologação formal soberana de Paulo Nunes para o site construído.
+ *
+ * PRÉ-REQUISITOS OBRIGATÓRIOS:
+ * 1. Aprovação de construção prévia formal (buildApproval.approved === true).
+ * 2. Construção executada (buildExecution.status === 'CONCLUIDA').
+ * 3. Validação técnica de arquivos aprovada (buildValidation.status === 'VALIDADA').
+ */
+function setHomologation(projectSlug, approved, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const cleanVersion = validateVersion(options.version || 'v2');
+
+  if (typeof approved !== 'boolean') {
+    throw new Error(`Parâmetro de homologação inválido: '${approved}'. A deliberação deve ser estritamente booleana (true para aprovar, false para rejeitar).`);
+  }
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(`Projeto inexistente ou manifest.json não encontrado para '${cleanSlug}' em: ${manifestPath}`);
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      throw new Error(`Falha ao ler manifest.json para '${cleanSlug}': ${e.message}`);
+    }
+  }
+
+  // PRÉ-REQUISITO 1: BUILD DEVE TER SIDO APROVADO
+  const buildApp = getBuildApproval(cleanSlug, { ...options, manifestOverride: manifest });
+  if (!buildApp.approved || buildApp.decision !== BUILD_DECISION_APPROVED) {
+    const err = new Error(`[HOMOLOGAÇÃO BLOQUEADA] Impossível homologar site para '${cleanSlug}': A construção não possui aprovação formal prévia.`);
+    err.code = 'CANNOT_HOMOLOGATE_UNAPPROVED_BUILD';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // PRÉ-REQUISITO 2: BUILD DEVE TER SIDO EXECUTADO
+  if (!manifest.buildExecution || manifest.buildExecution.status !== 'CONCLUIDA') {
+    const err = new Error(`[HOMOLOGAÇÃO BLOQUEADA] Impossível homologar site para '${cleanSlug}': O site ainda não foi construído (buildExecution ausente ou incompleto).`);
+    err.code = 'CANNOT_HOMOLOGATE_UNBUILT_SITE';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // PRÉ-REQUISITO 3: BUILD DEVE TER SIDO VALIDADO
+  if (!manifest.buildValidation || manifest.buildValidation.status !== 'VALIDADA' || !manifest.buildValidation.isValid) {
+    const err = new Error(`[HOMOLOGAÇÃO BLOQUEADA] Impossível homologar site para '${cleanSlug}': Os arquivos de produção não foram validados tecnicamente.`);
+    err.code = 'CANNOT_HOMOLOGATE_INVALID_BUILD';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // PRÉ-REQUISITO 4: ISOLAMENTO ESTRITO POR VERSÃO (cleanVersion === manifest.buildExecution.version)
+  const builtVersion = manifest.buildExecution.version;
+  let targetVersion = builtVersion;
+  if (options.version) {
+    const cleanVersion = validateVersion(options.version);
+    if (cleanVersion !== builtVersion) {
+      const err = new Error(`[VERSÃO INCOMPATÍVEL] A versão solicitada para homologação ('${cleanVersion}') difere da versão atualmente construída no destino ('${builtVersion}') para '${cleanSlug}'.`);
+      err.code = 'HOMOLOGATION_VERSION_MISMATCH';
+      err.projectSlug = cleanSlug;
+      err.requestedVersion = cleanVersion;
+      err.builtVersion = builtVersion;
+      throw err;
+    }
+    targetVersion = cleanVersion;
+  }
+
+  const decisionTimestamp = new Date().toISOString();
+  if (approved) {
+    manifest.siteHomologation = {
+      approved: true,
+      decision: HOMOLOGATION_DECISION_APPROVED,
+      status: 'HOMOLOGADA',
+      decisionBy: REQUIRED_APPROVER,
+      decisionAt: decisionTimestamp,
+      projectSlug: cleanSlug,
+      version: targetVersion,
+      notes: options.notes || 'Site de produção homologado soberanamente por Paulo Nunes após inspeção.'
+    };
+  } else {
+    manifest.siteHomologation = {
+      approved: false,
+      decision: HOMOLOGATION_DECISION_REJECTED,
+      status: 'REJEITADA',
+      decisionBy: REQUIRED_APPROVER,
+      decisionAt: decisionTimestamp,
+      projectSlug: cleanSlug,
+      version: targetVersion,
+      notes: options.notes || 'Homologação do site de produção rejeitada soberanamente por Paulo Nunes.'
+    };
+  }
 
   if (!options.manifestOverride && options.save !== false) {
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
   }
 
-  // PASSO 6: REGENERAR PAINEL_APROVACAO.MD
   if (options.updatePanel !== false && !options.manifestOverride && fs.existsSync(projectDir)) {
-    generateApprovalPanel(cleanSlug, cleanVersion, {
+    generateApprovalPanel(cleanSlug, targetVersion, {
       ...options,
       openInEditor: options.openInEditor !== undefined ? options.openInEditor : false
     });
@@ -853,9 +1313,138 @@ function executeBuildSite(projectSlug, version, options = {}) {
   return {
     success: true,
     projectSlug: cleanSlug,
-    version: cleanVersion,
-    buildExecution: manifest.buildExecution,
-    buildResult
+    version: targetVersion,
+    decision: manifest.siteHomologation.decision,
+    status: manifest.siteHomologation.status,
+    decisionBy: manifest.siteHomologation.decisionBy,
+    decisionAt: manifest.siteHomologation.decisionAt,
+    notes: manifest.siteHomologation.notes
+  };
+}
+
+/**
+ * Bloqueia operações caso a homologação do site não esteja formalmente concedida.
+ *
+ * VERIFICAÇÕES OBRIGATÓRIAS (GOVERNANÇA FASE 3):
+ * 1. Homologação formal válida concedida por Paulo Nunes (approved === true, decision === 'APPROVED').
+ * 2. Isolamento por versão: homologation.version === expectedVersion (se fornecido).
+ * 3. Coerência com o build atual: homologation.version === manifest.buildExecution.version.
+ * 4. Proteção temporal contra rebuild: homologation.decisionAt >= manifest.buildExecution.executedAt.
+ */
+function assertSiteHomologated(projectSlug, versionOrOptions = {}, maybeOptions = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+
+  let expectedVersion = null;
+  let options = {};
+
+  if (typeof versionOrOptions === 'string') {
+    expectedVersion = validateVersion(versionOrOptions);
+    options = maybeOptions || {};
+  } else if (typeof versionOrOptions === 'object' && versionOrOptions !== null) {
+    options = versionOrOptions;
+    if (options.version) {
+      expectedVersion = validateVersion(options.version);
+    }
+  }
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      const err = new Error(`[HOMOLOGAÇÃO NECESSÁRIA] Projeto inexistente ou manifest.json não encontrado para '${cleanSlug}'.`);
+      err.code = 'SITE_HOMOLOGATION_REQUIRED';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      const err = new Error(`[HOMOLOGAÇÃO NECESSÁRIA] Falha ao ler manifest.json para '${cleanSlug}': ${e.message}`);
+      err.code = 'SITE_HOMOLOGATION_REQUIRED';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+  }
+
+  const homologation = getHomologation(cleanSlug, { ...options, manifestOverride: manifest });
+
+  // 1. Decisão e aprovação soberana
+  if (!homologation.valid || !homologation.approved || homologation.decision !== HOMOLOGATION_DECISION_APPROVED) {
+    const err = new Error(`[HOMOLOGAÇÃO NECESSÁRIA] O site da oportunidade '${cleanSlug}' não possui homologação formal aprovada.`);
+    err.code = 'SITE_HOMOLOGATION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    err.status = homologation.status;
+    err.decision = homologation.decision;
+    throw err;
+  }
+
+  if (homologation.decisionBy !== REQUIRED_APPROVER) {
+    const err = new Error(`[HOMOLOGAÇÃO INVÁLIDA] Homologação requer aprovador oficial '${REQUIRED_APPROVER}'.`);
+    err.code = 'SITE_HOMOLOGATION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (!homologation.decisionAt || typeof homologation.decisionAt !== 'string') {
+    const err = new Error(`[HOMOLOGAÇÃO INVÁLIDA] Timestamp 'decisionAt' ausente ou inválido.`);
+    err.code = 'SITE_HOMOLOGATION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // 2. Isolamento por versão solicitada
+  if (expectedVersion && homologation.version !== expectedVersion) {
+    const err = new Error(`[VERSÃO NÃO HOMOLOGADA] A versão solicitada ('${expectedVersion}') difere da versão homologada ('${homologation.version}') para '${cleanSlug}'.`);
+    err.code = 'HOMOLOGATION_VERSION_MISMATCH';
+    err.projectSlug = cleanSlug;
+    err.requestedVersion = expectedVersion;
+    err.homologatedVersion = homologation.version;
+    throw err;
+  }
+
+  // 3. Coerência com buildExecution atualmente construído
+  if (!manifest.buildExecution || manifest.buildExecution.status !== 'CONCLUIDA') {
+    const err = new Error(`[HOMOLOGAÇÃO INVÁLIDA] Build de produção ausente ou incompleto para '${cleanSlug}'.`);
+    err.code = 'CANNOT_HOMOLOGATE_UNBUILT_SITE';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (homologation.version !== manifest.buildExecution.version) {
+    const err = new Error(`[VERSÃO NÃO HOMOLOGADA] A versão homologada ('${homologation.version}') difere da versão atualmente construída no destino ('${manifest.buildExecution.version}') para '${cleanSlug}'.`);
+    err.code = 'HOMOLOGATION_VERSION_MISMATCH';
+    err.projectSlug = cleanSlug;
+    err.homologatedVersion = homologation.version;
+    err.builtVersion = manifest.buildExecution.version;
+    throw err;
+  }
+
+  // 4. Proteção temporal contra rebuild
+  if (manifest.buildExecution.executedAt && homologation.decisionAt) {
+    const executedTime = new Date(manifest.buildExecution.executedAt).getTime();
+    const decisionTime = new Date(homologation.decisionAt).getTime();
+    if (!isNaN(executedTime) && !isNaN(decisionTime) && decisionTime < executedTime) {
+      const err = new Error(`[HOMOLOGAÇÃO OBSOLETA] A homologação concedida em '${homologation.decisionAt}' é anterior à última execução de build em '${manifest.buildExecution.executedAt}' para '${cleanSlug}'. Requer nova homologação.`);
+      err.code = 'HOMOLOGATION_STALE';
+      err.projectSlug = cleanSlug;
+      err.decisionAt = homologation.decisionAt;
+      err.executedAt = manifest.buildExecution.executedAt;
+      throw err;
+    }
+  }
+
+  return {
+    allowed: true,
+    projectSlug: cleanSlug,
+    version: homologation.version,
+    status: homologation.status,
+    decision: homologation.decision,
+    decisionBy: homologation.decisionBy,
+    decisionAt: homologation.decisionAt
   };
 }
 
@@ -924,6 +1513,23 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     buildStatusDisplay = '🟢 APROVADA';
   } else if (buildApproval.decision === BUILD_DECISION_REJECTED) {
     buildStatusDisplay = '🔴 REJEITADA';
+  }
+
+  const homologation = getHomologation(projectSlug, { ...options, manifestOverride: manifest });
+  const buildValidation = manifest.buildValidation || getBuildValidation(projectSlug, { ...options, manifestOverride: manifest });
+
+  let homologationStatusDisplay = '⏳ PENDENTE DE HOMOLOGAÇÃO';
+  if (homologation.decision === HOMOLOGATION_DECISION_APPROVED && homologation.approved) {
+    homologationStatusDisplay = '🟢 HOMOLOGADO';
+  } else if (homologation.decision === HOMOLOGATION_DECISION_REJECTED) {
+    homologationStatusDisplay = '🔴 REJEITADO';
+  }
+
+  let validationStatusDisplay = '⚪ PENDENTE DE VALIDAÇÃO';
+  if (buildValidation && buildValidation.status === 'VALIDADA' && buildValidation.isValid) {
+    validationStatusDisplay = '🟢 VALIDADA';
+  } else if (buildValidation && buildValidation.status === 'INVALIDA') {
+    validationStatusDisplay = '🔴 INVÁLIDA';
   }
 
   const content = [
@@ -1016,17 +1622,58 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     `> **COMANDOS DE DELIBERAÇÃO FORMAL:**`,
     `> - Para aprovar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-build\``,
     `> - Para rejeitar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-build\``,
-    `> - Para construir o site de produção: \`node dispatcher.js ${projectSlug} ${targetVersion} --build-site\``,
     ``,
     `---`,
     ``,
-    `## 🏗️ EXECUÇÃO DA CONSTRUÇÃO DO SITE`,
+    `## 🔨 EXECUÇÃO DA CONSTRUÇÃO DO SITE`,
     ``,
     `- **Status da Execução:** ${manifest.buildExecution ? (manifest.buildExecution.status === 'CONCLUIDA' ? '🟢 CONCLUÍDA' : manifest.buildExecution.status) : '⚪ NÃO INICIADA'}`,
     `- **Projeto:** \`${projectSlug}\``,
     `- **Versão Construída:** \`${manifest.buildExecution?.version || targetVersion}\``,
     `- **Data/Hora da Execução:** ${manifest.buildExecution?.executedAt || 'Pendente'}`,
     `- **Destino Canônico:** \`${siteInfo.siteDir}\``,
+    `- **Total de Arquivos:** ${manifest.buildExecution?.filesCount ?? (manifest.buildExecution?.files?.length || 'Pendente')}`,
+    ``,
+    `> [!NOTE]`,
+    `> **COMANDO DE CONSTRUÇÃO:**`,
+    `> - Para construir o site: \`node dispatcher.js ${projectSlug} ${targetVersion} --build-site\` (ou \`--execute-build\`)`,
+    ``,
+    `---`,
+    ``,
+    `## 🔎 VALIDAÇÃO DO BUILD`,
+    ``,
+    `- **Status da Validação:** ${validationStatusDisplay}`,
+    `- **Data/Hora da Validação:** ${buildValidation?.validatedAt || 'Pendente'}`,
+    `- **Destino Canônico:** \`${siteInfo.siteDir}\``,
+    `- **Checagens Estruturais:**`,
+    `  - [${buildValidation?.checks?.hasIndexHtml ? 'x' : ' '}] index.html presente com tamanho mínimo e estrutura válida`,
+    `  - [${buildValidation?.checks?.hasStylesCss ? 'x' : ' '}] styles.css presente e integrado`,
+    `  - [${buildValidation?.checks?.hasScriptJs ? 'x' : ' '}] script.js presente`,
+    `  - [${buildValidation?.checks?.noPreviewElements ? 'x' : ' '}] Elementos de preview higienizados`,
+    `  - [${buildValidation?.checks?.noForbiddenFiles ? 'x' : ' '}] Ausência de arquivos standalone / manifestos`,
+    `  - [${buildValidation?.checks?.noPreviewsGarimpoPath ? 'x' : ' '}] Destino isolado fora de previews-garimpo`,
+    ``,
+    `> [!NOTE]`,
+    `> **COMANDO DE VALIDAÇÃO TÉCNICA:**`,
+    `> - Para validar os arquivos do site: \`node dispatcher.js ${projectSlug} ${targetVersion} --validate-site\``,
+    ``,
+    `---`,
+    ``,
+    `## ✅ HOMOLOGAÇÃO DO SITE DE PRODUÇÃO`,
+    ``,
+    `- **Status da Homologação:** ${homologationStatusDisplay}`,
+    `- **Decisão Registrada:** \`${homologation.decision}\``,
+    `- **Projeto:** \`${projectSlug}\``,
+    `- **Homologador:** ${homologation.decisionBy || 'Pendente'}`,
+    `- **Data/Hora:** ${homologation.decisionAt || 'Pendente'}`,
+    `- **Notas de Homologação:** ${homologation.notes || '(Aguardando inspeção formal de Paulo Nunes)'}`,
+    `- **Regra de Governança:** A homologação do site exige verificação humana formal após inspeção do site local e não ocorre automaticamente pelo simples término do build.`,
+    ``,
+    `> [!NOTE]`,
+    `> **COMANDOS DE HOMOLOGAÇÃO:**`,
+    `> - Para homologar o site construído: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-homologation\``,
+    `> - Para rejeitar a homologação: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-homologation\``,
+    `> - Para consultar status: \`node dispatcher.js ${projectSlug} ${targetVersion} --homologation-status\``,
     ``,
     `---`,
     ``,
@@ -1325,8 +1972,8 @@ if (require.main === module) {
     process.exit(0);
   }
 
-  // Construção controlada do site de produção (Fase 2)
-  if (args.includes('--build-site')) {
+  // Construção controlada e orquestrada do site de produção (Fases 2 e 3)
+  if (args.includes('--build-site') || args.includes('--execute-build')) {
     try {
       const buildRes = executeBuildSite(slug, version);
       console.log(`\n====================================================`);
@@ -1335,6 +1982,7 @@ if (require.main === module) {
       console.log(`Projeto:      ${slug}`);
       console.log(`Versão:       ${version}`);
       console.log(`Status:       🟢 ${buildRes.buildExecution.status}`);
+      console.log(`Validação:    ${buildRes.buildValidation.isValid ? '🟢 VALIDADA' : '🔴 FALHOU'}`);
       console.log(`Destino:      ${buildRes.buildResult.canonicalPath}`);
       console.log(`Executado em: ${buildRes.buildExecution.executedAt}`);
       console.log(`Arquivos:     ${buildRes.buildResult.files.join(', ')}`);
@@ -1344,6 +1992,88 @@ if (require.main === module) {
       console.error(`\n[ERRO NA CONSTRUÇÃO]: ${err.message}`);
       process.exit(1);
     }
+  }
+
+  // Validação técnica independente dos arquivos no destino canônico (Fase 3)
+  if (args.includes('--validate-site')) {
+    const valRes = validateProductionSite(slug, version);
+    console.log(`\n====================================================`);
+    console.log(` 🔎 VALIDAÇÃO TÉCNICA DO SITE DE PRODUÇÃO`);
+    console.log(`====================================================`);
+    console.log(`Projeto:      ${slug}`);
+    console.log(`Versão:       ${version}`);
+    console.log(`Status:       ${valRes.isValid ? '🟢 VALIDADA' : '🔴 INVÁLIDA'}`);
+    console.log(`Destino:      ${valRes.canonicalPath}`);
+    console.log(`Data/Hora:    ${valRes.validatedAt}`);
+    console.log(`Checagens:`);
+    console.log(`  - Diretório de produção:       ${valRes.checks.dirExists ? '✓' : '✗'}`);
+    console.log(`  - index.html presente:          ${valRes.checks.hasIndexHtml ? '✓' : '✗'}`);
+    console.log(`  - index.html tamanho >= 200B:   ${valRes.checks.hasValidIndexHtmlSize ? '✓' : '✗'}`);
+    console.log(`  - index.html estrutura válida:  ${valRes.checks.hasValidHtmlStructure ? '✓' : '✗'}`);
+    console.log(`  - Elementos preview removidos:  ${valRes.checks.noPreviewElements ? '✓' : '✗'}`);
+    console.log(`  - styles.css presente:          ${valRes.checks.hasStylesCss ? '✓' : '✗'}`);
+    console.log(`  - script.js presente:           ${valRes.checks.hasScriptJs ? '✓' : '✗'}`);
+    console.log(`  - Sem arquivos standalone:      ${valRes.checks.noForbiddenFiles ? '✓' : '✗'}`);
+    console.log(`  - Isolado de previews-garimpo:  ${valRes.checks.noPreviewsGarimpoPath ? '✓' : '✗'}`);
+    console.log(`  - Destino canônico verificado:  ${valRes.checks.isCanonicalPath ? '✓' : '✗'}\n`);
+    process.exit(valRes.isValid ? 0 : 1);
+  }
+
+  // Homologação formal soberana do site construído (Fase 3)
+  if (args.includes('--approve-homologation')) {
+    try {
+      const res = setHomologation(slug, true, { version });
+      console.log(`\n====================================================`);
+      console.log(` HOMOLOGAÇÃO DO SITE REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:     ${slug}`);
+      console.log(`Versão:      ${version}`);
+      console.log(`Decisão:     🟢 ${res.decision} (${res.status})`);
+      console.log(`Homologador: ${res.decisionBy}`);
+      console.log(`Data/Hora:   ${res.decisionAt}`);
+      console.log(`Notas:       ${res.notes}`);
+      console.log(`Painel:      Atualizado em PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NA HOMOLOGAÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Rejeição formal da homologação do site (Fase 3)
+  if (args.includes('--reject-homologation')) {
+    try {
+      const res = setHomologation(slug, false, { version });
+      console.log(`\n====================================================`);
+      console.log(` REJEIÇÃO DE HOMOLOGAÇÃO REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:     ${slug}`);
+      console.log(`Versão:      ${version}`);
+      console.log(`Decisão:     🔴 ${res.decision} (${res.status})`);
+      console.log(`Homologador: ${res.decisionBy}`);
+      console.log(`Data/Hora:   ${res.decisionAt}`);
+      console.log(`Notas:       ${res.notes}`);
+      console.log(`Painel:      Atualizado em PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NA HOMOLOGAÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Consulta do status de homologação da oportunidade (Fase 3)
+  if (args.includes('--homologation-status')) {
+    const homo = getHomologation(slug);
+    console.log(`\n====================================================`);
+    console.log(` STATUS DE HOMOLOGAÇÃO DO SITE`);
+    console.log(`====================================================`);
+    console.log(`Projeto:     ${slug}`);
+    console.log(`Status:      ${homo.approved ? '🟢 HOMOLOGADO' : (homo.decision === 'REJECTED' ? '🔴 REJEITADO' : '⏳ PENDENTE DE HOMOLOGAÇÃO')}`);
+    console.log(`Decisão:     ${homo.decision}`);
+    console.log(`Homologador: ${homo.decisionBy || 'Pendente'}`);
+    console.log(`Data/Hora:   ${homo.decisionAt || 'Pendente'}`);
+    console.log(`Notas:       ${homo.notes || 'Pendente'}\n`);
+    process.exit(0);
   }
 
   executeDispatcher(slug, version, {
@@ -1372,6 +2102,10 @@ module.exports = {
   BUILD_STATUS_APPROVED,
   BUILD_STATUS_REJECTED,
   VALID_BUILD_STATUSES,
+  HOMOLOGATION_DECISION_PENDING,
+  HOMOLOGATION_DECISION_APPROVED,
+  HOMOLOGATION_DECISION_REJECTED,
+  VALID_HOMOLOGATION_DECISIONS,
   normalizeBuildDecision,
   parseMinuta,
   findMinutaFile,
@@ -1385,6 +2119,16 @@ module.exports = {
   setBuildApproval,
   validateBuildApproval,
   assertBuildApproved,
+  acquireBuildLock,
+  releaseBuildLock,
+  validateProductionSite,
+  getBuildValidation,
+  assertBuildValidated,
+  validateHomologation,
+  getHomologation,
+  setHomologation,
+  assertSiteHomologated,
   executeBuildSite,
+  executeApprovedBuild: executeBuildSite,
   buildSite: executeBuildSite
 };
