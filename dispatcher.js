@@ -35,6 +35,16 @@ const REQUIRED_APPROVER = 'Paulo Nunes';
 const REQUIRED_DECISION = 'APROVAR';
 const REQUIRED_STATUS = 'APPROVED';
 
+const BUILD_DECISION_PENDING = 'PENDING';
+const BUILD_DECISION_APPROVED = 'APPROVED';
+const BUILD_DECISION_REJECTED = 'REJECTED';
+const VALID_BUILD_DECISIONS = [BUILD_DECISION_PENDING, BUILD_DECISION_APPROVED, BUILD_DECISION_REJECTED];
+
+const BUILD_STATUS_PENDING = 'PENDENTE';
+const BUILD_STATUS_APPROVED = 'APROVADA';
+const BUILD_STATUS_REJECTED = 'REJEITADA';
+const VALID_BUILD_STATUSES = [BUILD_STATUS_PENDING, BUILD_STATUS_APPROVED, BUILD_STATUS_REJECTED];
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -497,6 +507,257 @@ function openProductionSiteInBrowser(projectSlug, options = {}) {
 }
 
 /**
+ * Normaliza e valida estritamente a decisão de construção do site.
+ * Rejeita qualquer texto livre, mensagens no chat ou linguagem natural.
+ */
+function normalizeBuildDecision(decision) {
+  if (typeof decision === 'boolean') {
+    return decision ? BUILD_DECISION_APPROVED : BUILD_DECISION_REJECTED;
+  }
+  if (!decision || typeof decision !== 'string') {
+    throw new Error(`Decisão inválida ou ausente: '${decision}'. Decisões aceitas: PENDING, APPROVED, REJECTED.`);
+  }
+
+  const clean = decision.trim().toUpperCase();
+
+  // Lista de bloqueio estrito para exemplos de linguagem natural
+  const forbiddenNaturalPhrases = [
+    'PODE CONSTRUIR',
+    'PODE COMECAR',
+    'PODE COMEÇAR',
+    'CLIENTE APROVOU',
+    'PODE IMPLEMENTAR',
+    'COMECE O SITE',
+    'VAMOS CONSTRUIR',
+    'ESTA APROVADO',
+    'ESTÁ APROVADO',
+    'PODE AVANCAR',
+    'PODE AVANÇAR',
+    'CLIENTE AUTORIZOU'
+  ];
+
+  for (const phrase of forbiddenNaturalPhrases) {
+    if (clean.includes(phrase)) {
+      throw new Error(`[GOVERNANÇA BLOQUEADA] Linguagem natural não autoriza construção ('${decision}'). Exige decisão determinística formal (APPROVED | REJECTED | PENDING).`);
+    }
+  }
+
+  if (clean === 'APPROVED' || clean === 'APROVADA' || clean === 'APROVAR') {
+    return BUILD_DECISION_APPROVED;
+  }
+  if (clean === 'REJECTED' || clean === 'REJEITADA' || clean === 'REJEITAR') {
+    return BUILD_DECISION_REJECTED;
+  }
+  if (clean === 'PENDING' || clean === 'PENDENTE') {
+    return BUILD_DECISION_PENDING;
+  }
+
+  throw new Error(`Decisão de aprovação de construção não reconhecida: '${decision}'. Decisões aceitas: PENDING, APPROVED, REJECTED. Linguagem natural não é aceita.`);
+}
+
+/**
+ * Obtém o estado atual da aprovação de construção de uma oportunidade.
+ * Ausência de buildApproval no manifesto é tratada como PENDING por padrão seguro.
+ */
+function getBuildApproval(projectSlug, options = {}) {
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, projectSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      return {
+        approved: false,
+        decision: BUILD_DECISION_PENDING,
+        decisionBy: null,
+        decisionAt: null,
+        projectSlug,
+        exists: false,
+        status: BUILD_STATUS_PENDING,
+        reason: 'MANIFEST_NOT_FOUND'
+      };
+    }
+
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (e) {
+      return {
+        approved: false,
+        decision: BUILD_DECISION_PENDING,
+        decisionBy: null,
+        decisionAt: null,
+        projectSlug,
+        exists: false,
+        status: BUILD_STATUS_PENDING,
+        reason: 'INVALID_MANIFEST_JSON'
+      };
+    }
+  }
+
+  const rawApproval = manifest.buildApproval;
+  if (!rawApproval || typeof rawApproval !== 'object') {
+    return {
+      approved: false,
+      decision: BUILD_DECISION_PENDING,
+      decisionBy: null,
+      decisionAt: null,
+      projectSlug,
+      exists: true,
+      status: BUILD_STATUS_PENDING,
+      reason: 'DEFAULT_PENDING'
+    };
+  }
+
+  let decision = BUILD_DECISION_PENDING;
+  try {
+    decision = normalizeBuildDecision(rawApproval.decision || '');
+  } catch (e) {
+    decision = BUILD_DECISION_PENDING;
+  }
+
+  const decisionBy = rawApproval.decisionBy || null;
+  const decisionAt = rawApproval.decisionAt || null;
+  const isApproverValid = (decisionBy === REQUIRED_APPROVER);
+  const isApproved = (decision === BUILD_DECISION_APPROVED) && isApproverValid && Boolean(decisionAt);
+
+  let status = BUILD_STATUS_PENDING;
+  if (decision === BUILD_DECISION_APPROVED && isApproved) {
+    status = BUILD_STATUS_APPROVED;
+  } else if (decision === BUILD_DECISION_REJECTED) {
+    status = BUILD_STATUS_REJECTED;
+  }
+
+  return {
+    approved: isApproved,
+    decision,
+    decisionBy,
+    decisionAt,
+    projectSlug,
+    exists: true,
+    status,
+    reason: isApproved ? 'APPROVED_BY_SOVEREIGN' : (decision === BUILD_DECISION_REJECTED ? 'REJECTED' : 'PENDING')
+  };
+}
+
+/**
+ * Registra a decisão formal de aprovação da construção para uma oportunidade específica.
+ * Isolamento total por projectSlug: nunca altera outros projetos.
+ */
+function setBuildApproval(projectSlug, approved, options = {}) {
+  if (!projectSlug || typeof projectSlug !== 'string' || projectSlug.trim() === '') {
+    throw new Error('projectSlug inválido ou ausente para setBuildApproval.');
+  }
+
+  const normalizedDecision = normalizeBuildDecision(approved);
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, projectSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(`Projeto inexistente ou manifest.json não encontrado para '${projectSlug}' em: ${manifestPath}`);
+    }
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (e) {
+      throw new Error(`Falha ao ler manifest.json para '${projectSlug}': ${e.message}`);
+    }
+  }
+
+  // Verificação estrita de correspondência de projectSlug
+  if (manifest.projectSlug && manifest.projectSlug !== projectSlug) {
+    throw new Error(`Inconsistência de isolamento: projectSlug solicitado (${projectSlug}) difere do manifesto (${manifest.projectSlug})`);
+  }
+
+  const approver = options.approver || REQUIRED_APPROVER;
+  if (normalizedDecision === BUILD_DECISION_APPROVED && approver !== REQUIRED_APPROVER) {
+    throw new Error(`Aprovador inválido: '${approver}'. Apenas '${REQUIRED_APPROVER}' pode autorizar a aprovação de construção.`);
+  }
+
+  const now = options.timestamp || new Date().toISOString();
+
+  manifest.buildApproval = {
+    approved: (normalizedDecision === BUILD_DECISION_APPROVED),
+    decision: normalizedDecision,
+    decisionBy: (normalizedDecision === BUILD_DECISION_PENDING ? null : approver),
+    decisionAt: (normalizedDecision === BUILD_DECISION_PENDING ? null : now)
+  };
+
+  if (!options.manifestOverride && options.save !== false) {
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  }
+
+  // Atualiza dinamicamente o PAINEL_APROVACAO.md
+  if (options.updatePanel !== false && !options.manifestOverride && fs.existsSync(projectDir)) {
+    generateApprovalPanel(projectSlug, manifest.version || 'v2', {
+      ...options,
+      openInEditor: options.openInEditor !== undefined ? options.openInEditor : false
+    });
+  }
+
+  return {
+    approved: manifest.buildApproval.approved,
+    decision: manifest.buildApproval.decision,
+    decisionBy: manifest.buildApproval.decisionBy,
+    decisionAt: manifest.buildApproval.decisionAt,
+    projectSlug,
+    status: (normalizedDecision === BUILD_DECISION_APPROVED ? BUILD_STATUS_APPROVED : (normalizedDecision === BUILD_DECISION_REJECTED ? BUILD_STATUS_REJECTED : BUILD_STATUS_PENDING))
+  };
+}
+
+/**
+ * Validação determinística do estado de aprovação de construção.
+ */
+function validateBuildApproval(projectSlug, options = {}) {
+  const approval = getBuildApproval(projectSlug, options);
+  const isValid = VALID_BUILD_DECISIONS.includes(approval.decision);
+
+  return {
+    valid: isValid,
+    approved: approval.approved,
+    decision: approval.decision,
+    decisionBy: approval.decisionBy,
+    decisionAt: approval.decisionAt,
+    projectSlug,
+    status: approval.status
+  };
+}
+
+/**
+ * Mecanismo de bloqueio/autorização para futura fase de construção.
+ * Bloqueia PENDENTE e REJEITADA; permite exclusivamente APROVADA por Paulo Nunes.
+ */
+function assertBuildApproved(projectSlug, options = {}) {
+  const validation = validateBuildApproval(projectSlug, options);
+
+  if (!validation.approved) {
+    const errorMsg = `[BLOQUEIO DE GOVERNANÇA] Construção não autorizada para o projeto '${projectSlug}'. Estado atual: ${validation.status} (${validation.decision}). Exige decisão formal 'APPROVED' por '${REQUIRED_APPROVER}'.`;
+    const err = new Error(errorMsg);
+    err.code = 'BUILD_APPROVAL_REQUIRED';
+    err.status = validation.status;
+    err.decision = validation.decision;
+    err.projectSlug = projectSlug;
+    throw err;
+  }
+
+  return {
+    allowed: true,
+    projectSlug,
+    status: validation.status,
+    decision: validation.decision,
+    decisionBy: validation.decisionBy,
+    decisionAt: validation.decisionAt
+  };
+}
+
+/**
  * Gera o Painel de Aprovação Comercial estruturado (PAINEL_APROVACAO.md).
  * CAMADA DE VISUALIZAÇÃO PASSIVA: NÃO EXECUTA DISPARO, NÃO ALTERA O MANIFEST.
  */
@@ -552,8 +813,16 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
   const body = gateResult.bodyText || '';
   const initialSnippet = body.length > 220 ? body.substring(0, 220).replace(/\r?\n/g, ' ') + '...' : body;
 
-  // Detecção dinâmica e genérica do site de produção
+  // Detecção dinâmica e genérica do site de produção e aprovação da construção
   const siteInfo = getProductionSitePath(projectSlug, options);
+  const buildApproval = getBuildApproval(projectSlug, { ...options, manifestOverride: manifest });
+
+  let buildStatusDisplay = '⏳ PENDENTE DE APROVAÇÃO';
+  if (buildApproval.decision === BUILD_DECISION_APPROVED && buildApproval.approved) {
+    buildStatusDisplay = '🟢 APROVADA';
+  } else if (buildApproval.decision === BUILD_DECISION_REJECTED) {
+    buildStatusDisplay = '🔴 REJEITADA';
+  }
 
   const content = [
     `# PAINEL DE APROVAÇÃO COMERCIAL — GARIMPO SITES`,
@@ -631,6 +900,23 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     ``,
     `---`,
     ``,
+    `## 🏗️ APROVAÇÃO DA CONSTRUÇÃO DO SITE`,
+    ``,
+    `### Aprovação da Construção`,
+    `- **Status Atual:** ${buildStatusDisplay}`,
+    `- **Decisão Registrada:** \`${buildApproval.decision}\``,
+    `- **Projeto:** \`${projectSlug}\``,
+    `- **Aprovador:** ${buildApproval.decisionBy || 'Pendente'}`,
+    `- **Data/Hora:** ${buildApproval.decisionAt || 'Pendente'}`,
+    `- **Estado de Governança:** Somente uma decisão formal e explícita autoriza a construção. Linguagem natural, comentários, texto no painel ou ausência de decisão NÃO autorizam a construção.`,
+    ``,
+    `> [!NOTE]`,
+    `> **COMANDOS DE DELIBERAÇÃO FORMAL:**`,
+    `> - Para aprovar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-build\``,
+    `> - Para rejeitar a construção: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-build\``,
+    ``,
+    `---`,
+    ``,
     `## 🌐 SITE DE PRODUÇÃO`,
     ``,
     ...(siteInfo.exists ? [
@@ -683,6 +969,7 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     sender,
     subject,
     previewUrl,
+    buildApproval,
     productionSite: {
       exists: siteInfo.exists,
       path: siteInfo.indexPath
@@ -871,6 +1158,60 @@ if (require.main === module) {
     }
   }
 
+  // Aprovação formal da construção do site
+  if (args.includes('--approve-build')) {
+    try {
+      const res = setBuildApproval(slug, 'APPROVED', { approver: 'Paulo Nunes' });
+      console.log(`\n====================================================`);
+      console.log(` APROVAÇÃO DE CONSTRUÇÃO REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:   ${slug}`);
+      console.log(`Decisão:   🟢 ${res.decision} (${res.status})`);
+      console.log(`Aprovador: ${res.decisionBy}`);
+      console.log(`Data/Hora: ${res.decisionAt}`);
+      console.log(`Painel:    Atualizado em Garimpo-sites\\esbocos\\${slug}\\PAINEL_APROVACAO.md`);
+      console.log(`\n(Construção NÃO iniciada nesta fase. Governança registrada com sucesso)\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO DE GOVERNANÇA]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Rejeição formal da construção do site
+  if (args.includes('--reject-build')) {
+    try {
+      const res = setBuildApproval(slug, 'REJECTED', { approver: 'Paulo Nunes' });
+      console.log(`\n====================================================`);
+      console.log(` REJEIÇÃO DE CONSTRUÇÃO REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:   ${slug}`);
+      console.log(`Decisão:   🔴 ${res.decision} (${res.status})`);
+      console.log(`Aprovador: ${res.decisionBy}`);
+      console.log(`Data/Hora: ${res.decisionAt}`);
+      console.log(`Painel:    Atualizado em Garimpo-sites\\esbocos\\${slug}\\PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO DE GOVERNANÇA]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Consulta do status de aprovação da construção do site
+  if (args.includes('--build-status')) {
+    const val = validateBuildApproval(slug);
+    console.log(`\n====================================================`);
+    console.log(` STATUS DE APROVAÇÃO DA CONSTRUÇÃO`);
+    console.log(`====================================================`);
+    console.log(`Projeto:   ${val.projectSlug}`);
+    console.log(`Status:    ${val.approved ? '🟢 APROVADA' : (val.decision === 'REJECTED' ? '🔴 REJEITADA' : '⏳ PENDENTE DE APROVAÇÃO')}`);
+    console.log(`Decisão:   ${val.decision}`);
+    console.log(`Aprovador: ${val.decisionBy || 'Pendente'}`);
+    console.log(`Data/Hora: ${val.decisionAt || 'Pendente'}`);
+    console.log(`Autorizado para construção: ${val.approved ? 'SIM' : 'NÃO'}\n`);
+    process.exit(0);
+  }
+
   executeDispatcher(slug, version, {
     productionSend: isProduction,
     dryRun: !isProduction
@@ -889,6 +1230,15 @@ module.exports = {
   REQUIRED_APPROVER,
   REQUIRED_DECISION,
   REQUIRED_STATUS,
+  BUILD_DECISION_PENDING,
+  BUILD_DECISION_APPROVED,
+  BUILD_DECISION_REJECTED,
+  VALID_BUILD_DECISIONS,
+  BUILD_STATUS_PENDING,
+  BUILD_STATUS_APPROVED,
+  BUILD_STATUS_REJECTED,
+  VALID_BUILD_STATUSES,
+  normalizeBuildDecision,
   parseMinuta,
   findMinutaFile,
   validateEmailGate,
@@ -896,5 +1246,9 @@ module.exports = {
   openInAntigravityEditor,
   executeDispatcher,
   getProductionSitePath,
-  openProductionSiteInBrowser
+  openProductionSiteInBrowser,
+  getBuildApproval,
+  setBuildApproval,
+  validateBuildApproval,
+  assertBuildApproved
 };
