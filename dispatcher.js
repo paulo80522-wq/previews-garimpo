@@ -377,6 +377,7 @@ function validateEmailGate(projectSlug, version, options = {}) {
       allowed: false,
       reason: primaryReason,
       status: currentStatus,
+      manifest,
       message: `BLOQUEIO DETERMINÍSTICO: O Gate rejeitou o disparo (${primaryReason}).`,
       errors,
       validationLog
@@ -388,6 +389,7 @@ function validateEmailGate(projectSlug, version, options = {}) {
     allowed: true,
     status: REQUIRED_STATUS,
     dryRun: true,
+    manifest,
     reason: 'GATE_PASSED_DRY_RUN_ONLY',
     message: '[DRY-RUN] Validação determinística do Gate aprovada integralmente. Pronto para simulação segura.',
     recipient: recipient ? recipient.trim() : null,
@@ -406,6 +408,193 @@ function validateEmailGate(projectSlug, version, options = {}) {
       validatedAt: new Date().toISOString()
     },
     validationLog
+  };
+}
+
+/**
+ * Abre ou foca um arquivo no editor central do Antigravity IDE (via CLI nativa)
+ */
+function openInAntigravityEditor(filePath) {
+  const ideCmd = 'C:\\Users\\35tul\\AppData\\Local\\Programs\\Antigravity IDE\\bin\\antigravity-ide.cmd';
+  if (!fs.existsSync(filePath)) return false;
+  try {
+    const { execSync } = require('child_process');
+    if (fs.existsSync(ideCmd)) {
+      execSync(`"${ideCmd}" -r "${filePath}"`, {
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: 5000
+      });
+      return true;
+    }
+  } catch (e) {
+    // Fallback silencioso caso o processo já tenha sido repassado à janela ativa
+  }
+  return false;
+}
+
+/**
+ * Gera o Painel de Aprovação Comercial estruturado (PAINEL_APROVACAO.md).
+ * CAMADA DE VISUALIZAÇÃO PASSIVA: NÃO EXECUTA DISPARO, NÃO ALTERA O MANIFEST.
+ */
+function generateApprovalPanel(projectSlug, version, options = {}) {
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, projectSlug);
+
+  const gateResult = options.gateResult || validateEmailGate(projectSlug, version, options);
+  const manifest = gateResult.manifest || {};
+
+  const targetVersion = version || (gateResult.audit && gateResult.audit.version) || manifest.version || 'v2';
+  const companyName = manifest.companyName || manifest.projectName || projectSlug;
+  const projectName = manifest.projectName || projectSlug;
+  const recipient = gateResult.recipient || '(Destinatário não definido)';
+  const sender = gateResult.sender || OFFICIAL_SENDER;
+  const senderDisplayName = 'Paulo Nunes | Consultoria de Presença Digital';
+  const subject = gateResult.subject || '(Assunto não definido)';
+  const previewUrl = gateResult.previewUrl || (manifest.publicPreview && manifest.publicPreview.url) || '(URL não definida)';
+  const gateStatus = gateResult.status || 'UNKNOWN';
+  const gateAllowed = gateResult.allowed === true;
+
+  // Determina o badge visual de estado
+  let statusBadge = '';
+  let statusAlert = '';
+  if (gateStatus === 'APPROVED' && gateAllowed) {
+    statusBadge = '🟢 APPROVED (APROVADO — ENVIO RETIDO EM DRY-RUN)';
+    statusAlert = [
+      `> [!NOTE]`,
+      `> **STATUS: APROVADO POR PAULO NUNES (AGUARDANDO COMANDO DE DISPARO)**  `,
+      `> A oportunidade foi homologada no Gate Formal, mas o envio real **NÃO É DISPARADO AUTOMATICAMENTE**.  `,
+      `> O sistema permanece em modo de simulação DRY-RUN até comando explícito com a flag '--production-send'.`
+    ].join('\n');
+  } else if (gateStatus === 'PENDING_APPROVAL') {
+    statusBadge = '🟡 PENDING_APPROVAL (AGUARDANDO DELIBERAÇÃO SOBERANA)';
+    statusAlert = [
+      `> [!IMPORTANT]`,
+      `> **STATUS: PENDING_APPROVAL (BLOQUEIO DE GOVERNANÇA)**  `,
+      `> A oportunidade foi preparada e encontra-se aguardando deliberação soberana de Paulo Nunes.  `,
+      `> Qualquer tentativa de envio comercial está terminantemente bloqueada.`
+    ].join('\n');
+  } else {
+    statusBadge = `🔴 ${gateStatus} (BLOQUEADO PELO GATE)`;
+    statusAlert = [
+      `> [!WARNING]`,
+      `> **STATUS: BLOQUEADO PELO GATE DETERMINÍSTICO**  `,
+      `> Motivo: ${gateResult.reason || 'REJEITADO'}  `,
+      `> O envio não é permitido pelas regras de segurança vigentes.`
+    ].join('\n');
+  }
+
+  // Resumo/Prévia da mensagem
+  const body = gateResult.bodyText || '';
+  const initialSnippet = body.length > 220 ? body.substring(0, 220).replace(/\r?\n/g, ' ') + '...' : body;
+
+  const content = [
+    `# PAINEL DE APROVAÇÃO COMERCIAL — GARIMPO SITES`,
+    ``,
+    `> [!WARNING]`,
+    `> **MODO ATUAL: DRY-RUN (SIMULAÇÃO SEGURA)**  `,
+    `> O envio comercial real ainda **NÃO FOI REALIZADO**. Esta visualização tem caráter informativo e de decisão.`,
+    ``,
+    statusAlert,
+    ``,
+    `---`,
+    ``,
+    `### 1. EMPRESA / OPORTUNIDADE`,
+    `- **Nome da Empresa:** ${companyName}`,
+    `- **Project Slug:** \`${projectSlug}\``,
+    `- **Versão Homologada:** \`${targetVersion}\``,
+    ``,
+    `### 2. DESTINATÁRIO`,
+    `- **E-mail de Destino:** \`${recipient}\``,
+    ``,
+    `### 3. REMETENTE`,
+    `- **E-mail Oficial:** \`${sender}\``,
+    `- **Nome de Exibição:** ${senderDisplayName}`,
+    `- **RFC 2047 Encoded:** \`=?UTF-8?B?UGF1bG8gTnVuZXMgfCBDb25zdWx0b3JpYSBkZSBQcmVzZW7Dp2EgRGlnaXRhbA==?=\``,
+    ``,
+    `### 4. ASSUNTO`,
+    `- **Assunto Completo:** \`${subject}\``,
+    ``,
+    `### 5. ESBOÇO / PROTÓTIPO`,
+    `- **Nome do Protótipo:** Protótipo Visual ${projectName} (${targetVersion})`,
+    `- **Tecnologia:** HTML5 Semântico / CSS3 / Mobile-First WCAG 2.1`,
+    ``,
+    `### 6. LINK DO ESBOÇO`,
+    `- **URL Pública Homologada:**  `,
+    `  👉 [${previewUrl}](${previewUrl})  `,
+    `  *(Aferição: Exatamente a mesma URL transmitida no pacote do e-mail)*`,
+    ``,
+    `### 7. RESUMO DA MENSAGEM (PRÉVIA EXECUTIVA)`,
+    `- **Início da Abordagem:** *"${initialSnippet}"*`,
+    `- **Tamanho do Corpo:** ${body.length} caracteres`,
+    `- **Minuta Auditada:** \`${gateResult.minutaPath || 'in-memory'}\``,
+    ``,
+    `**Prévia Completa do Texto:**`,
+    `\`\`\`text`,
+    body,
+    `\`\`\``,
+    ``,
+    `### 8. STATUS DO GATE`,
+    `- **Classificação de Estado:** \`${statusBadge}\``,
+    `- **Aprovador Formal:** ${gateResult.audit?.approvedBy || manifest.approvedBy || '(Pendente)'}`,
+    `- **Data de Aprovação:** ${gateResult.audit?.approvedAt || manifest.approvedAt || '(Pendente)'}`,
+    `- **Decisão Registrada:** ${gateResult.audit?.decision || manifest.approvalGate?.decision || '(Pendente)'}`,
+    `- **Aprovação Comercial:** ${gateResult.audit?.commercialApproval ?? manifest.publicPreview?.commercialApproval ?? false}`,
+    ``,
+    `### 9. CHECKLIST DE SEGURANÇA`,
+    `- [${gateResult.sender === OFFICIAL_SENDER ? 'x' : ' '}] Remetente oficial verificado (\`${OFFICIAL_SENDER}\`)`,
+    `- [${recipient && recipient.includes('@') ? 'x' : ' '}] Destinatário explicitamente definido e válido (\`${recipient}\`)`,
+    `- [${gateResult.minutaPath ? 'x' : ' '}] Minuta correspondente encontrada e legível`,
+    `- [${previewUrl && previewUrl.startsWith('http') ? 'x' : ' '}] URL do protótipo homologada e limpa`,
+    `- [${gateResult.audit?.decision === 'APROVAR' ? 'x' : ' '}] Decisão do Gate formalizada`,
+    `- [${gateStatus === 'APPROVED' ? 'x' : ' '}] Status do manifest validado`,
+    `- [x] Modo atual: **DRY-RUN (Simulação estrita sem rede externa)**`,
+    `- [x] Garantia de Governança: Esta visualização NÃO dispara e-mails`,
+    ``,
+    `### 10. PRÉVIA DO ENVIO (RESPOSTAS IMEDIATAS)`,
+    `| Pergunta do Decisor | Resposta do Sistema |`,
+    `| :--- | :--- |`,
+    `| **Quem vai receber?** | \`${recipient}\` (${companyName}) |`,
+    `| **De qual e-mail?** | \`${sender}\` |`,
+    `| **Qual assunto?** | \`${subject}\` |`,
+    `| **Qual esboço?** | ${projectName} (${targetVersion}) |`,
+    `| **Qual link será enviado?** | [${previewUrl}](${previewUrl}) |`,
+    `| **Qual é o estado da aprovação?** | \`${gateStatus}\` (Envio retido) |`,
+    `| **O sistema está em DRY-RUN ou produção?** | **DRY-RUN** |`,
+    ``,
+    `---`,
+    `### COMANDO PARA AUTORIZAR DISPARO REAL (SOMENTE APÓS DELIBERAÇÃO HUMANA)`,
+    `> [!CAUTION]`,
+    `> **ATENÇÃO:** O envio real é irreversível e exige autorização soberana prévia de Paulo Nunes.`,
+    `\`\`\`bash`,
+    `node dispatcher.js ${projectSlug} ${targetVersion} --production-send`,
+    `\`\`\``,
+    ``
+  ].join('\n');
+
+  // Grava o arquivo PAINEL_APROVACAO.md na pasta da oportunidade
+  let savedPath = null;
+  if (fs.existsSync(projectDir)) {
+    savedPath = path.join(projectDir, 'PAINEL_APROVACAO.md');
+    fs.writeFileSync(savedPath, content, 'utf8');
+  }
+
+  // Tenta abrir/focar no editor central do Antigravity IDE se solicitado
+  if (savedPath && options.openInEditor !== false) {
+    openInAntigravityEditor(savedPath);
+  }
+
+  return {
+    success: true,
+    savedPath,
+    content,
+    statusBadge,
+    gateStatus,
+    recipient,
+    sender,
+    subject,
+    previewUrl
   };
 }
 
@@ -488,6 +677,7 @@ async function executeDispatcher(projectSlug, version, options = {}) {
     });
 
     if (dryRunMode) {
+      const panelRes = generateApprovalPanel(projectSlug, version, { ...options, gateResult });
       console.log('PACOTE DE DISPARO (SIMULAÇÃO DRY-RUN):');
       console.log(`  De:          ${gateResult.sender}`);
       console.log(`  Para:        ${gateResult.recipient}`);
@@ -495,6 +685,9 @@ async function executeDispatcher(projectSlug, version, options = {}) {
       console.log(`  Preview URL: ${gateResult.previewUrl}`);
       console.log(`  Minuta:      ${gateResult.minutaPath}`);
       console.log(`  Tamanho:     ${gateResult.bodyText ? gateResult.bodyText.length : 0} caracteres`);
+      if (panelRes && panelRes.savedPath) {
+        console.log(`  Painel:      ${panelRes.savedPath}`);
+      }
       console.log('----------------------------------------------------');
       console.log('[CONFIRMAÇÃO DE SEGURANÇA]');
       console.log('Nenhuma conexão externa efetuada.');
@@ -551,6 +744,18 @@ if (require.main === module) {
   const slug = positionalArgs[0] || 'castlink-world';
   const version = positionalArgs[1] || 'v2';
 
+  // Modo exclusivo de visualização/geração do Painel Central
+  if (args.includes('--panel')) {
+    const panelRes = generateApprovalPanel(slug, version);
+    console.log(`\n====================================================`);
+    console.log(` PAINEL DE APROVAÇÃO COMERCIAL GERADO COM SUCESSO`);
+    console.log(`====================================================`);
+    console.log(`Arquivo: ${panelRes.savedPath}`);
+    console.log(`Status:  ${panelRes.statusBadge}`);
+    console.log(`\n(Visualização central aberta no editor Antigravity IDE)\n`);
+    process.exit(0);
+  }
+
   executeDispatcher(slug, version, {
     productionSend: isProduction,
     dryRun: !isProduction
@@ -572,5 +777,7 @@ module.exports = {
   parseMinuta,
   findMinutaFile,
   validateEmailGate,
+  generateApprovalPanel,
+  openInAntigravityEditor,
   executeDispatcher
 };
