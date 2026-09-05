@@ -434,6 +434,69 @@ function openInAntigravityEditor(filePath) {
 }
 
 /**
+ * Resolve dinamicamente os caminhos canônicos do site de produção para qualquer oportunidade.
+ */
+function getProductionSitePath(projectSlug, options = {}) {
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, projectSlug);
+  const siteDir = path.join(projectDir, 'site-producao');
+  const indexPath = path.join(siteDir, 'index.html');
+  return {
+    projectDir,
+    siteDir,
+    indexPath,
+    exists: fs.existsSync(indexPath)
+  };
+}
+
+/**
+ * Abre o arquivo de produção index.html no navegador padrão do sistema operacional.
+ */
+function openProductionSiteInBrowser(projectSlug, options = {}) {
+  const siteInfo = getProductionSitePath(projectSlug, options);
+  if (!siteInfo.exists) {
+    return {
+      success: false,
+      message: `Arquivo index.html de produção não encontrado em: ${siteInfo.indexPath}`,
+      filePath: siteInfo.indexPath
+    };
+  }
+
+  try {
+    const { exec } = require('child_process');
+    if (process.platform === 'win32') {
+      const child = exec(`start "" "${siteInfo.indexPath}"`, { windowsHide: true });
+      if (child && typeof child.unref === 'function') {
+        child.unref();
+      }
+      return {
+        success: true,
+        filePath: siteInfo.indexPath,
+        message: 'Aberto no navegador padrão do Windows'
+      };
+    } else {
+      const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+      const child = exec(`${cmd} "${siteInfo.indexPath}"`);
+      if (child && typeof child.unref === 'function') {
+        child.unref();
+      }
+      return {
+        success: true,
+        filePath: siteInfo.indexPath,
+        message: `Aberto via ${cmd}`
+      };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      message: err.message,
+      filePath: siteInfo.indexPath
+    };
+  }
+}
+
+/**
  * Gera o Painel de Aprovação Comercial estruturado (PAINEL_APROVACAO.md).
  * CAMADA DE VISUALIZAÇÃO PASSIVA: NÃO EXECUTA DISPARO, NÃO ALTERA O MANIFEST.
  */
@@ -488,6 +551,9 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
   // Resumo/Prévia da mensagem
   const body = gateResult.bodyText || '';
   const initialSnippet = body.length > 220 ? body.substring(0, 220).replace(/\r?\n/g, ' ') + '...' : body;
+
+  // Detecção dinâmica e genérica do site de produção
+  const siteInfo = getProductionSitePath(projectSlug, options);
 
   const content = [
     `# PAINEL DE APROVAÇÃO COMERCIAL — GARIMPO SITES`,
@@ -564,6 +630,28 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     `| **O sistema está em DRY-RUN ou produção?** | **DRY-RUN** |`,
     ``,
     `---`,
+    ``,
+    `## 🌐 SITE DE PRODUÇÃO`,
+    ``,
+    ...(siteInfo.exists ? [
+      `- **Status Local:** 🟢 DISPONÍVEL NO DISCO LOCAL (SITE DE PRODUÇÃO LOCAL)`,
+      `- **Localização Canônica:** \`${siteInfo.indexPath}\``,
+      `- **Acesso Direto:** 👉 [ABRIR SITE DE PRODUÇÃO](file:///${siteInfo.indexPath.replace(/\\/g, '/')})`,
+      ``,
+      `> [!NOTE]`,
+      `> **VISUALIZAÇÃO SEGURA (LOCAL):** Este link abre a versão definitiva de produção diretamente do armazenamento local do seu computador. Não requer conexão à internet, não realiza publicação e não altera o preview público.`,
+      ``,
+      `**Comando para abrir no navegador padrão via terminal:**`,
+      `\`\`\`bash`,
+      `node dispatcher.js ${projectSlug} ${targetVersion} --open-site`,
+      `\`\`\``
+    ] : [
+      `⚪ SITE DE PRODUÇÃO AINDA NÃO DISPONÍVEL`,
+      ``,
+      `O diretório \`site-producao/index.html\` ainda não foi gerado para esta oportunidade.`
+    ]),
+    ``,
+    `---`,
     `### COMANDO PARA AUTORIZAR DISPARO REAL (SOMENTE APÓS DELIBERAÇÃO HUMANA)`,
     `> [!CAUTION]`,
     `> **ATENÇÃO:** O envio real é irreversível e exige autorização soberana prévia de Paulo Nunes.`,
@@ -594,7 +682,11 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     recipient,
     sender,
     subject,
-    previewUrl
+    previewUrl,
+    productionSite: {
+      exists: siteInfo.exists,
+      path: siteInfo.indexPath
+    }
   };
 }
 
@@ -752,8 +844,31 @@ if (require.main === module) {
     console.log(`====================================================`);
     console.log(`Arquivo: ${panelRes.savedPath}`);
     console.log(`Status:  ${panelRes.statusBadge}`);
+    if (panelRes.productionSite && panelRes.productionSite.exists) {
+      console.log(`Site:    🟢 DISPONÍVEL (${panelRes.productionSite.path})`);
+    } else {
+      console.log(`Site:    ⚪ AINDA NÃO DISPONÍVEL`);
+    }
     console.log(`\n(Visualização central aberta no editor Antigravity IDE)\n`);
     process.exit(0);
+  }
+
+  // Abertura direta do site de produção no navegador padrão do sistema
+  if (args.includes('--open-site') || args.includes('--open-production-site')) {
+    const openRes = openProductionSiteInBrowser(slug);
+    if (openRes.success) {
+      console.log(`\n====================================================`);
+      console.log(` 🌐 SITE DE PRODUÇÃO ABERTO COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Oportunidade: ${slug}`);
+      console.log(`Arquivo:      ${openRes.filePath}`);
+      console.log(`\n(Site aberto no navegador padrão do Windows)\n`);
+      process.exit(0);
+    } else {
+      console.error(`\n[AVISO] Site de produção não disponível para: ${slug}`);
+      console.error(`Motivo: ${openRes.message}`);
+      process.exit(1);
+    }
   }
 
   executeDispatcher(slug, version, {
@@ -779,5 +894,7 @@ module.exports = {
   validateEmailGate,
   generateApprovalPanel,
   openInAntigravityEditor,
-  executeDispatcher
+  executeDispatcher,
+  getProductionSitePath,
+  openProductionSiteInBrowser
 };

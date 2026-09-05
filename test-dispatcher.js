@@ -13,7 +13,7 @@
  * TESTE 8: Remetente diferente de paulonunes.consultoriadigital@gmail.com -> BLOQUEADO
  */
 
-const { validateEmailGate } = require('./dispatcher');
+const { validateEmailGate, getProductionSitePath, generateApprovalPanel } = require('./dispatcher');
 
 function runTestSuite() {
   console.log('========================================================================');
@@ -247,6 +247,70 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       name: 'Remetente diferente do oficial',
       expected: 'BLOQUEADO (reason: UNAUTHORIZED_SENDER)',
       actual: `allowed: ${res.allowed} | reason: ${res.reason}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 9: Detecção de Site de Produção Existente (castlink-world)
+  // --------------------------------------------------------------------------
+  {
+    const siteInfo = getProductionSitePath('castlink-world');
+    const panelRes = generateApprovalPanel('castlink-world', 'v2', { openInEditor: false });
+
+    const containsSiteSection = panelRes.content.includes('## 🌐 SITE DE PRODUÇÃO');
+    const containsOpenLink = panelRes.content.includes('[ABRIR SITE DE PRODUÇÃO]');
+    const containsCanonicalPath = panelRes.content.includes(siteInfo.indexPath);
+
+    const passed = siteInfo.exists === true && containsSiteSection && containsOpenLink && containsCanonicalPath;
+    results.push({
+      testNumber: 9,
+      name: 'Site de Produção Existente (castlink-world)',
+      expected: 'exists: true, seção ## 🌐 SITE DE PRODUÇÃO e link dinâmico [ABRIR SITE DE PRODUÇÃO]',
+      actual: `exists: ${siteInfo.exists} | section: ${containsSiteSection} | openLink: ${containsOpenLink}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 10: Detecção de Site de Produção Ausente (oportunidade genérica sem site)
+  // --------------------------------------------------------------------------
+  {
+    const siteInfo = getProductionSitePath('projeto-teste-sem-producao');
+    const mockManifest = getBaseApprovedManifest();
+    mockManifest.projectSlug = 'projeto-teste-sem-producao';
+
+    const panelRes = generateApprovalPanel('projeto-teste-sem-producao', 'v1', {
+      openInEditor: false,
+      gateResult: {
+        allowed: true,
+        status: 'APPROVED',
+        manifest: mockManifest,
+        recipient: 'teste@dominio.com',
+        sender: 'paulonunes.consultoriadigital@gmail.com',
+        subject: 'Assunto Teste',
+        previewUrl: 'https://preview.exemplo.com',
+        minutaPath: 'in-memory',
+        bodyText: 'Mensagem teste',
+        audit: {
+          approvedBy: 'Paulo Nunes',
+          approvedAt: '2026-09-04T22:19:10.000Z',
+          decision: 'APROVAR',
+          commercialApproval: true
+        }
+      }
+    });
+
+    const containsSiteSection = panelRes.content.includes('## 🌐 SITE DE PRODUÇÃO');
+    const containsUnavailableMsg = panelRes.content.includes('⚪ SITE DE PRODUÇÃO AINDA NÃO DISPONÍVEL');
+    const doesNotContainOpenLink = !panelRes.content.includes('[ABRIR SITE DE PRODUÇÃO]');
+
+    const passed = (siteInfo.exists === false) && containsSiteSection && containsUnavailableMsg && doesNotContainOpenLink;
+    results.push({
+      testNumber: 10,
+      name: 'Site de Produção Ausente (genérico sem hardcode)',
+      expected: 'exists: false, aviso de indisponibilidade e zero links quebrados',
+      actual: `exists: ${siteInfo.exists} | unavailableMsg: ${containsUnavailableMsg} | noBrokenLink: ${doesNotContainOpenLink}`,
       passed
     });
   }
