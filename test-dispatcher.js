@@ -70,9 +70,28 @@ const {
   releasePublicationLock,
   isPublicationLockActive,
   generateHandoverDossier,
-  creativeGovernance,
   ERR_PRODUCTION_EXECUTION_DISABLED,
-  PUBLICATION_TARGET_PENDING
+  PUBLICATION_TARGET_PENDING,
+  ENVIRONMENT_TYPES,
+  PROTECTED_DOMAINS,
+  registerProtectedDomain,
+  clearProtectedDomains,
+  getProtectedDomains,
+  isProtectedDomain,
+  assertDomainNotProtected,
+  resolveEnvironmentType,
+  executeControlledPublication,
+  assertPublicationSafetyGate,
+  REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED,
+  REAL_CASTLINK_DOMAIN_STATUS,
+  getRealCastLinkDomainStatus,
+  ERR_PUBLICATION_CONTEXT_AMBIGUOUS,
+  ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE,
+  ERR_PROTECTED_DOMAIN_FORBIDDEN,
+  ERR_UNAUTHORIZED_TARGET_DESTINATION,
+  ERR_FORBIDDEN_LAB_INFRASTRUCTURE,
+  ERR_FORBIDDEN_CLIENT_DOMAIN,
+  ERR_MISSING_TARGET_REPOSITORY
 } = require('./dispatcher');
 
 const {
@@ -4987,6 +5006,1297 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       expected: 'Hashes SHA-256 de index, script, styles e manifest inalterados',
       actual: `matchAll: ${matchAll}`,
       passed: matchAll
+    });
+  }
+
+  // ==========================================================================
+  // FASE 7 — ISOLAMENTO ABSOLUTO DO CASTLINK REAL + EXECUTOR CONTROLADO
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 158 (FASE 7 - Req 1): castlink_world_plan_without_custom_domain
+  // castlink-world pode gerar plano sem customDomain
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-158-'));
+    try {
+      createIsolatedMockProject(tempDir, 'castlink-world', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('castlink-world', 'v2', { baseDir: tempDir });
+      setHomologation('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('castlink-world', 'v2', {
+        baseDir: tempDir,
+        publicationTarget: PUBLICATION_TARGET_PENDING
+      });
+
+      const passed = (plan.environment === ENVIRONMENT_TYPES.CASTLINK_WORLD) &&
+                     (plan.targetConfig.customDomain === null) &&
+                     (plan.targetConfigured === false) &&
+                     (plan.dryRun === true) &&
+                     (plan.executionAllowed === false);
+
+      results.push({
+        testNumber: 158,
+        name: 'castlink_world_plan_without_custom_domain (castlink-world gera plano sem customDomain)',
+        expected: 'environment: CASTLINK_WORLD, customDomain: null, dryRun: true',
+        actual: `env: ${plan.environment} | domain: ${plan.targetConfig.customDomain} | dryRun: ${plan.dryRun}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 159 (FASE 7 - Req 2): castlink_world_no_cname_without_custom_domain
+  // castlink-world não gera CNAME quando não existe customDomain
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-159-'));
+    try {
+      createIsolatedMockProject(tempDir, 'castlink-world', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('castlink-world', 'v2', { baseDir: tempDir });
+      setHomologation('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('castlink-world', 'v2', {
+        baseDir: tempDir,
+        publicationTarget: {
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'paulo80522-wq/castlink-world-lab',
+          targetBranch: 'main'
+        }
+      });
+
+      const hasCname = plan.expectedFiles.some(f => f.relativePath === 'CNAME');
+      const diskCname = fs.existsSync(path.join(tempDir, 'castlink-world', 'site-producao', 'CNAME'));
+
+      const passed = (!hasCname) && (!diskCname) && (plan.targetConfig.customDomain === null);
+
+      results.push({
+        testNumber: 159,
+        name: 'castlink_world_no_cname_without_custom_domain (Nenhum CNAME gerado para castlink-world sem customDomain)',
+        expected: 'hasCname: false e diskCname: false',
+        actual: `hasCname: ${hasCname} | diskCname: ${diskCname}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 160 (FASE 7 - Req 3): castlink_world_protected_domain_forbidden
+  // castlink-world não pode utilizar domínio protegido
+  // --------------------------------------------------------------------------
+  {
+    registerProtectedDomain('castlink-producao-real.com');
+    try {
+      let capturedErr = null;
+      try {
+        validateCustomDomain('castlink-producao-real.com', 'castlink-world');
+      } catch (err) {
+        capturedErr = err;
+      }
+
+      let targetErr = null;
+      try {
+        validatePublicationTarget({
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'paulo80522-wq/castlink-world-lab',
+          customDomain: 'castlink-producao-real.com'
+        }, 'castlink-world');
+      } catch (err) {
+        targetErr = err;
+      }
+
+      const passed = (capturedErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN') &&
+                     (targetErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN');
+
+      results.push({
+        testNumber: 160,
+        name: 'castlink_world_protected_domain_forbidden (castlink-world rejeita deterministamente domínio protegido)',
+        expected: 'PROTECTED_DOMAIN_FORBIDDEN',
+        actual: `domainErr: ${capturedErr?.code} | targetErr: ${targetErr?.code}`,
+        passed
+      });
+    } finally {
+      clearProtectedDomains();
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 161 (FASE 7 - Req 4): protected_domain_rejected_before_any_write
+  // Um domínio protegido é rejeitado antes de qualquer escrita/lock
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-161-'));
+    registerProtectedDomain('intocavel.castlink.com.br');
+    try {
+      createIsolatedMockProject(tempDir, 'castlink-world', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('castlink-world', 'v2', { baseDir: tempDir });
+      setHomologation('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+
+      const lockPath = path.join(tempDir, 'castlink-world', '.publication.lock');
+      let writeErr = null;
+
+      try {
+        executeControlledPublication('castlink-world', 'v2', {
+          baseDir: tempDir,
+          publicationTarget: {
+            provider: 'GITHUB_PAGES',
+            targetRepository: 'paulo80522-wq/castlink-world-lab',
+            customDomain: 'intocavel.castlink.com.br'
+          }
+        });
+      } catch (e) {
+        writeErr = e;
+      }
+
+      const lockCreated = fs.existsSync(lockPath);
+      const passed = (writeErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN') && (!lockCreated);
+
+      results.push({
+        testNumber: 161,
+        name: 'protected_domain_rejected_before_any_write (Rejeição determinística ocorre antes de qualquer escrita em disco)',
+        expected: 'PROTECTED_DOMAIN_FORBIDDEN e lockCreated: false',
+        actual: `code: ${writeErr?.code} | lockCreated: ${lockCreated}`,
+        passed
+      });
+    } finally {
+      clearProtectedDomains();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 162 (FASE 7 - Req 5): castlink_world_domain_exclusive_to_lab
+  // castlink.world continua reservado exclusivamente ao laboratório/teste
+  // --------------------------------------------------------------------------
+  {
+    let clientErr = null;
+    try {
+      validateCustomDomain('castlink.world', 'cliente-exemplo');
+    } catch (e) {
+      clientErr = e;
+    }
+
+    let subClientErr = null;
+    try {
+      validateCustomDomain('app.castlink.world', 'cliente-exemplo');
+    } catch (e) {
+      subClientErr = e;
+    }
+
+    // Para o laboratório (castlink-world), a validação FQDN de castlink.world é permitida
+    const labValid = validateCustomDomain('castlink.world', 'castlink-world');
+
+    const passed = (clientErr?.code === 'FORBIDDEN_CLIENT_DOMAIN') &&
+                   (subClientErr?.code === 'FORBIDDEN_CLIENT_DOMAIN') &&
+                   (labValid === 'castlink.world');
+
+    results.push({
+      testNumber: 162,
+      name: 'castlink_world_domain_exclusive_to_lab (castlink.world bloqueado para clientes e reservado ao lab)',
+      expected: 'FORBIDDEN_CLIENT_DOMAIN para cliente e aceito para castlink-world',
+      actual: `client: ${clientErr?.code} | subClient: ${subClientErr?.code} | lab: ${labValid}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 163 (FASE 7 - Req 6): client_cannot_use_protected_domain
+  // Domínio protegido não pode ser usado por cliente
+  // --------------------------------------------------------------------------
+  {
+    registerProtectedDomain('castlink-oficial.com');
+    try {
+      let clientErr = null;
+      try {
+        validatePublicationTarget({
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'cliente-alfa/site',
+          customDomain: 'castlink-oficial.com'
+        }, 'cliente-alfa');
+      } catch (e) {
+        clientErr = e;
+      }
+
+      const passed = (clientErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN');
+
+      results.push({
+        testNumber: 163,
+        name: 'client_cannot_use_protected_domain (Cliente é categoricamente impedido de usar domínio protegido)',
+        expected: 'PROTECTED_DOMAIN_FORBIDDEN',
+        actual: `code: ${clientErr?.code}`,
+        passed
+      });
+    } finally {
+      clearProtectedDomains();
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 164 (FASE 7 - Req 7): previews_garimpo_forbidden_as_client_target
+  // previews-garimpo continua proibido como destino de produção de cliente
+  // --------------------------------------------------------------------------
+  {
+    let targetErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'usuario/previews-garimpo',
+        targetBranch: 'main'
+      }, 'cliente-beta');
+    } catch (e) {
+      targetErr = e;
+    }
+
+    const passed = (targetErr?.code === 'FORBIDDEN_TARGET_REPOSITORY');
+
+    results.push({
+      testNumber: 164,
+      name: 'previews_garimpo_forbidden_as_client_target (previews-garimpo rejeitado como destino de produção)',
+      expected: 'FORBIDDEN_TARGET_REPOSITORY',
+      actual: `code: ${targetErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 165 (FASE 7 - Req 8): client_project_cannot_target_lab_infrastructure
+  // Projeto de cliente não pode apontar para infraestrutura do laboratório
+  // --------------------------------------------------------------------------
+  {
+    let targetErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-gama/castlink-world',
+        targetBranch: 'main'
+      }, 'cliente-gama');
+    } catch (e) {
+      targetErr = e;
+    }
+
+    let targetErr2 = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'castlink-world/repo-cliente',
+        targetBranch: 'main'
+      }, 'cliente-gama');
+    } catch (e) {
+      targetErr2 = e;
+    }
+
+    const passed = (targetErr?.code === 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET') &&
+                   (targetErr2?.code === 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET');
+
+    results.push({
+      testNumber: 165,
+      name: 'client_project_cannot_target_lab_infrastructure (Cliente bloqueado de apontar para repositório do laboratório)',
+      expected: 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET',
+      actual: `err1: ${targetErr?.code} | err2: ${targetErr2?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 166 (FASE 7 - Req 9): client_project_requires_own_repository
+  // Projeto de cliente exige repositório próprio
+  // --------------------------------------------------------------------------
+  {
+    let missingRepoErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetBranch: 'main'
+      }, 'cliente-delta');
+    } catch (e) {
+      missingRepoErr = e;
+    }
+
+    let invalidRepoErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: '../traversal/repo',
+        targetBranch: 'main'
+      }, 'cliente-delta');
+    } catch (e) {
+      invalidRepoErr = e;
+    }
+
+    const passed = (missingRepoErr?.code === 'MISSING_TARGET_REPOSITORY') &&
+                   (invalidRepoErr?.code === 'INVALID_TARGET_REPOSITORY');
+
+    results.push({
+      testNumber: 166,
+      name: 'client_project_requires_own_repository (Destino de cliente exige targetRepository próprio e válido)',
+      expected: 'MISSING_TARGET_REPOSITORY e INVALID_TARGET_REPOSITORY',
+      actual: `missing: ${missingRepoErr?.code} | invalid: ${invalidRepoErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 167 (FASE 7 - Req 10): executor_blocked_against_real_publication
+  // Executor continua bloqueado contra publicação real
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-167-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-real-block', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-real-block', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-real-block', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-real-block', true, { baseDir: tempDir, version: 'v1' });
+
+      let dryRunFalseErr = null;
+      try {
+        executeControlledPublication('empresa-real-block', 'v1', {
+          baseDir: tempDir,
+          dryRun: false
+        });
+      } catch (e) {
+        dryRunFalseErr = e;
+      }
+
+      let executeRealErr = null;
+      try {
+        executeControlledPublication('empresa-real-block', 'v1', {
+          baseDir: tempDir,
+          executeReal: true
+        });
+      } catch (e) {
+        executeRealErr = e;
+      }
+
+      let publishSiteErr = null;
+      try {
+        publishProductionSite('empresa-real-block', 'v1', { baseDir: tempDir });
+      } catch (e) {
+        publishSiteErr = e;
+      }
+
+      const passed = (dryRunFalseErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                     (executeRealErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                     (publishSiteErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED');
+
+      results.push({
+        testNumber: 167,
+        name: 'executor_blocked_against_real_publication (Qualquer tentativa de execução real é terminantemente abortada)',
+        expected: 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+        actual: `dryRunFalse: ${dryRunFalseErr?.code} | executeReal: ${executeRealErr?.code} | publishSite: ${publishSiteErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 168 (FASE 7 - Req 11): no_tokens_or_credentials_needed
+  // Nenhum token ou credencial é necessário para os testes
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-168-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-no-token', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-no-token', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-no-token', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-no-token', true, { baseDir: tempDir, version: 'v1' });
+
+      // Garante explicitamente que nenhuma credencial ou token foi fornecido
+      const result = executeControlledPublication('empresa-no-token', 'v1', {
+        baseDir: tempDir,
+        tokens: null,
+        credentials: null,
+        secrets: null
+      });
+
+      const passed = (result.success === true) &&
+                     (result.dryRun === true) &&
+                     (result.simulationReport.status === 'SIMULATED_SUCCESSFULLY');
+
+      results.push({
+        testNumber: 168,
+        name: 'no_tokens_or_credentials_needed (Simulação e validações operam com 100% de autonomia sem tokens)',
+        expected: 'success: true e dryRun: true sem exigir tokens',
+        actual: `success: ${result.success} | dryRun: ${result.dryRun} | status: ${result.simulationReport.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 169 (FASE 7 - Req 12): no_real_castlink_files_altered
+  // Nenhum arquivo real do CastLink fora do laboratório é alterado
+  // --------------------------------------------------------------------------
+  {
+    const realDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\site-producao';
+    const realManifestPath = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\manifest.json';
+
+    const refHashes = {
+      index: '3906EDED896640B58994A25DA0D4BA01F049FA4B5F98C06EA0E59A1E3470F5C1',
+      script: '0656979CE0E669BC2ED3F21F1FBC60E37EB4F3E8EF4C2320639FADBBBC24BBA3',
+      styles: '006EB504A993AE1F100862EF4B17CF1147440F7392221F16B011EF59CA15F1F6',
+      manifest: '9A8D7D25C5355C163F20643239555DEF11BC5CB58A6B9B3BE177E22984275875'
+    };
+
+    let matchAll = false;
+    if (fs.existsSync(realDir) && fs.existsSync(realManifestPath)) {
+      const indexSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'index.html'))).digest('hex').toUpperCase();
+      const scriptSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'script.js'))).digest('hex').toUpperCase();
+      const stylesSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'styles.css'))).digest('hex').toUpperCase();
+      const manifestSha = crypto.createHash('sha256').update(fs.readFileSync(realManifestPath)).digest('hex').toUpperCase();
+
+      matchAll = (indexSha === refHashes.index) &&
+                 (scriptSha === refHashes.script) &&
+                 (stylesSha === refHashes.styles) &&
+                 (manifestSha === refHashes.manifest);
+    }
+
+    results.push({
+      testNumber: 169,
+      name: 'no_real_castlink_files_altered (Hashes canônicos de castlink-world permanecem 100% inalterados)',
+      expected: 'Hashes SHA-256 de index, script, styles e manifest idênticos à referência canônica',
+      actual: `matchAll: ${matchAll}`,
+      passed: matchAll
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 170 (FASE 7 - Req 13): no_dns_altered_during_execution
+  // Nenhum DNS é alterado
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-170-'));
+    try {
+      createIsolatedMockProject(tempDir, 'castlink-world', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('castlink-world', 'v2', { baseDir: tempDir });
+      setHomologation('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+
+      const result = executeControlledPublication('castlink-world', 'v2', {
+        baseDir: tempDir
+      });
+
+      // Operação 100% em simulação sem chamada ou mutação de DNS
+      const passed = (result.simulationReport.targetInfrastructure.customDomain === null) &&
+                     (result.simulationReport.targetInfrastructure.cnameArtifactPlanned === false) &&
+                     (result.simulationReport.remotePublicationExecuted === false);
+
+      results.push({
+        testNumber: 170,
+        name: 'no_dns_altered_during_execution (Operação puramente local sem nenhuma modificação de DNS)',
+        expected: 'customDomain: null, cnameArtifactPlanned: false, remotePublicationExecuted: false',
+        actual: `domain: ${result.simulationReport.targetInfrastructure.customDomain} | cnamePlanned: ${result.simulationReport.targetInfrastructure.cnameArtifactPlanned}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 171 (FASE 7 - Req 14): no_real_cname_created
+  // Nenhum CNAME real é criado
+  // --------------------------------------------------------------------------
+  {
+    const canonicalCname = path.join('C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\site-producao', 'CNAME');
+    const projectRootCname = path.join('C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world', 'CNAME');
+    const workspaceCname = path.join(__dirname, 'CNAME');
+
+    const canonicalExists = fs.existsSync(canonicalCname);
+    const rootExists = fs.existsSync(projectRootCname);
+    const workspaceExists = fs.existsSync(workspaceCname);
+
+    const passed = (!canonicalExists) && (!rootExists) && (!workspaceExists);
+
+    results.push({
+      testNumber: 171,
+      name: 'no_real_cname_created (Nenhum arquivo CNAME foi gravado no repositório ou no ambiente canônico)',
+      expected: 'canonical: false, root: false, workspace: false',
+      actual: `canonical: ${canonicalExists} | root: ${rootExists} | workspace: ${workspaceExists}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 172 (FASE 7 - Req 15): no_network_calls_for_publication
+  // Nenhuma chamada de rede para publicação é executada
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-172-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-no-net', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-no-net', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-no-net', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-no-net', true, { baseDir: tempDir, version: 'v1' });
+
+      const res = executeControlledPublication('empresa-no-net', 'v1', {
+        baseDir: tempDir,
+        publicationTarget: {
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'cliente/repo-isolado',
+          targetBranch: 'main',
+          customDomain: 'www.cliente-isolado.com.br'
+        }
+      });
+
+      const passed = (res.success === true) &&
+                     (res.simulated === true) &&
+                     (res.dryRun === true) &&
+                     (res.simulationReport.remotePublicationExecuted === false) &&
+                     (res.executionAllowed === false);
+
+      results.push({
+        testNumber: 172,
+        name: 'no_network_calls_for_publication (Execução controlada simula plano sem efetuar chamadas remotas)',
+        expected: 'simulated: true, dryRun: true, remotePublicationExecuted: false',
+        actual: `simulated: ${res.simulated} | dryRun: ${res.dryRun} | remoteExec: ${res.simulationReport.remotePublicationExecuted}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 173 (FASE 7 - Req 5): castlink_real_environment_untouchable
+  // CASTLINK_REAL não pode ser executado pelo executor
+  // --------------------------------------------------------------------------
+  {
+    let realEnvErr = null;
+    try {
+      executeControlledPublication('castlink-real', 'v1');
+    } catch (e) {
+      realEnvErr = e;
+    }
+
+    let realOptionErr = null;
+    try {
+      executeControlledPublication('empresa-qualquer', 'v1', {
+        environment: ENVIRONMENT_TYPES.CASTLINK_REAL
+      });
+    } catch (e) {
+      realOptionErr = e;
+    }
+
+    const passed = (realEnvErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (realOptionErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+
+    results.push({
+      testNumber: 173,
+      name: 'castlink_real_environment_untouchable (CASTLINK_REAL é absolutamente intocável pelo executor)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE',
+      actual: `realEnv: ${realEnvErr?.code} | realOption: ${realOptionErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 174 (FASE 7 - Req 3 & 4): protected_domain_forbids_cname_and_plan
+  // Domínio real protegido não pode gerar CNAME nem gerar plano de publicação
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-174-'));
+    registerProtectedDomain('dominio-real-protegido.com');
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-cname-block', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-cname-block', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-cname-block', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-cname-block', true, { baseDir: tempDir, version: 'v1' });
+
+      let planErr = null;
+      try {
+        buildProductionPublicationPlan('empresa-cname-block', 'v1', {
+          baseDir: tempDir,
+          publicationTarget: {
+            provider: 'GITHUB_PAGES',
+            targetRepository: 'cliente/repo-valido',
+            customDomain: 'dominio-real-protegido.com',
+            cnameRequired: true
+          }
+        });
+      } catch (e) {
+        planErr = e;
+      }
+
+      let cnameErr = null;
+      try {
+        formatCnameContent('dominio-real-protegido.com', 'empresa-cname-block');
+      } catch (e) {
+        cnameErr = e;
+      }
+
+      const passed = (planErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN') &&
+                     (cnameErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN');
+
+      results.push({
+        testNumber: 174,
+        name: 'protected_domain_forbids_cname_and_plan (Domínio protegido não pode gerar CNAME nem plano)',
+        expected: 'PROTECTED_DOMAIN_FORBIDDEN',
+        actual: `planErr: ${planErr?.code} | cnameErr: ${cnameErr?.code}`,
+        passed
+      });
+    } finally {
+      clearProtectedDomains();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 175 (GATE SEGURO - Req 1): safety_gate_castlink_real_never_published
+  // CASTLINK_REAL nunca pode ser publicado
+  // --------------------------------------------------------------------------
+  {
+    let slugErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-real', 'v1');
+    } catch (e) {
+      slugErr = e;
+    }
+
+    let envErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-qualquer', 'v1', {}, { environment: ENVIRONMENT_TYPES.CASTLINK_REAL });
+    } catch (e) {
+      envErr = e;
+    }
+
+    let optionErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-qualquer', 'v1', {}, { isCastlinkReal: true });
+    } catch (e) {
+      optionErr = e;
+    }
+
+    let execErr = null;
+    try {
+      executeControlledPublication('castlink-real', 'v1');
+    } catch (e) {
+      execErr = e;
+    }
+
+    const passed = (slugErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (envErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (optionErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (execErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+
+    results.push({
+      testNumber: 175,
+      name: 'safety_gate_castlink_real_never_published (CASTLINK_REAL nunca pode ser publicado)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE em todas as vias',
+      actual: `slug: ${slugErr?.code} | env: ${envErr?.code} | opt: ${optionErr?.code} | exec: ${execErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 176 (GATE SEGURO - Req 2): safety_gate_castlink_real_never_receives_cname
+  // CASTLINK_REAL nunca pode receber CNAME
+  // --------------------------------------------------------------------------
+  {
+    let cnameSlugErr = null;
+    try {
+      formatCnameContent('meudominio.com', 'castlink-real');
+    } catch (e) {
+      cnameSlugErr = e;
+    }
+
+    let cnameEnvErr = null;
+    try {
+      formatCnameContent('meudominio.com', 'projeto-x', { environment: ENVIRONMENT_TYPES.CASTLINK_REAL });
+    } catch (e) {
+      cnameEnvErr = e;
+    }
+
+    let cnameOptErr = null;
+    try {
+      formatCnameContent('meudominio.com', 'projeto-x', { isCastlinkReal: true });
+    } catch (e) {
+      cnameOptErr = e;
+    }
+
+    let gateCnameErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-real', 'v1', { cnameRequired: true, customDomain: 'dominio.com' });
+    } catch (e) {
+      gateCnameErr = e;
+    }
+
+    const passed = (cnameSlugErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (cnameEnvErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (cnameOptErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (gateCnameErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+
+    results.push({
+      testNumber: 176,
+      name: 'safety_gate_castlink_real_never_receives_cname (CASTLINK_REAL nunca pode receber CNAME)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE em geração e formatação de CNAME',
+      actual: `slug: ${cnameSlugErr?.code} | env: ${cnameEnvErr?.code} | opt: ${cnameOptErr?.code} | gate: ${gateCnameErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 177 (GATE SEGURO - Req 3): safety_gate_castlink_real_never_receives_domain_alteration
+  // CASTLINK_REAL nunca pode receber alteração de domínio
+  // --------------------------------------------------------------------------
+  {
+    let domainSlugErr = null;
+    try {
+      validateCustomDomain('novo-dominio.com', 'castlink-real');
+    } catch (e) {
+      domainSlugErr = e;
+    }
+
+    let domainOptErr = null;
+    try {
+      validateCustomDomain('novo-dominio.com', 'projeto-x', { isCastlinkReal: true });
+    } catch (e) {
+      domainOptErr = e;
+    }
+
+    let targetErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'owner/repo',
+        customDomain: 'novo.com'
+      }, 'castlink-real');
+    } catch (e) {
+      targetErr = e;
+    }
+
+    const passed = (domainSlugErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (domainOptErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (targetErr?.code === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+
+    results.push({
+      testNumber: 177,
+      name: 'safety_gate_castlink_real_never_receives_domain_alteration (CASTLINK_REAL nunca pode ter domínio alterado)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE em validação e target',
+      actual: `domainSlug: ${domainSlugErr?.code} | domainOpt: ${domainOptErr?.code} | target: ${targetErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 178 (GATE SEGURO - Req 4): safety_gate_castlink_world_never_receives_custom_domain
+  // castlink-world nunca pode receber customDomain na publicação
+  // --------------------------------------------------------------------------
+  {
+    let labDomainErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-world', 'v2', { customDomain: 'www.meudominio.com' });
+    } catch (e) {
+      labDomainErr = e;
+    }
+
+    let labSameDomainErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-world', 'v2', { customDomain: 'castlink.world' });
+    } catch (e) {
+      labSameDomainErr = e;
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-178-'));
+    let planLabErr = null;
+    try {
+      createIsolatedMockProject(tempDir, 'castlink-world', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('castlink-world', 'v2', { baseDir: tempDir });
+      setHomologation('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('castlink-world', true, { baseDir: tempDir, version: 'v2' });
+
+      buildProductionPublicationPlan('castlink-world', 'v2', {
+        baseDir: tempDir,
+        publicationTarget: {
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'paulo80522-wq/castlink-world-lab',
+          customDomain: 'qualquer.com'
+        }
+      });
+    } catch (e) {
+      planLabErr = e;
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+
+    const passed = (labDomainErr?.code === 'LAB_CUSTOM_DOMAIN_FORBIDDEN') &&
+                   (labSameDomainErr?.code === 'LAB_CUSTOM_DOMAIN_FORBIDDEN') &&
+                   (planLabErr?.code === 'LAB_CUSTOM_DOMAIN_FORBIDDEN');
+
+    results.push({
+      testNumber: 178,
+      name: 'safety_gate_castlink_world_never_receives_custom_domain (castlink-world nunca recebe customDomain no gate)',
+      expected: 'LAB_CUSTOM_DOMAIN_FORBIDDEN',
+      actual: `labDomain: ${labDomainErr?.code} | labSame: ${labSameDomainErr?.code} | planLab: ${planLabErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 179 (GATE SEGURO - Req 5): safety_gate_castlink_world_never_generates_cname
+  // castlink-world nunca pode gerar CNAME
+  // --------------------------------------------------------------------------
+  {
+    let cnameFormatErr = null;
+    try {
+      formatCnameContent('castlink.world', 'castlink-world');
+    } catch (e) {
+      cnameFormatErr = e;
+    }
+
+    let cnameAnyErr = null;
+    try {
+      formatCnameContent('outro.com', 'castlink-world');
+    } catch (e) {
+      cnameAnyErr = e;
+    }
+
+    let gateCnameErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-world', 'v2', { cnameRequired: true });
+    } catch (e) {
+      gateCnameErr = e;
+    }
+
+    const passed = (cnameFormatErr?.code === 'LAB_CNAME_FORBIDDEN') &&
+                   (cnameAnyErr?.code === 'LAB_CNAME_FORBIDDEN') &&
+                   (gateCnameErr?.code === 'LAB_CNAME_FORBIDDEN');
+
+    results.push({
+      testNumber: 179,
+      name: 'safety_gate_castlink_world_never_generates_cname (castlink-world nunca pode gerar CNAME)',
+      expected: 'LAB_CNAME_FORBIDDEN',
+      actual: `cnameFormat: ${cnameFormatErr?.code} | cnameAny: ${cnameAnyErr?.code} | gateCname: ${gateCnameErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 180 (GATE SEGURO - Req 6): safety_gate_client_never_uses_castlink_world_domain
+  // cliente nunca pode usar castlink.world
+  // --------------------------------------------------------------------------
+  {
+    let clientDomainErr = null;
+    try {
+      validateCustomDomain('castlink.world', 'cliente-zeta');
+    } catch (e) {
+      clientDomainErr = e;
+    }
+
+    let subDomainErr = null;
+    try {
+      validateCustomDomain('painel.castlink.world', 'cliente-zeta');
+    } catch (e) {
+      subDomainErr = e;
+    }
+
+    let gateDomainErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-zeta', 'v1', { customDomain: 'castlink.world' });
+    } catch (e) {
+      gateDomainErr = e;
+    }
+
+    const passed = (clientDomainErr?.code === 'FORBIDDEN_CLIENT_DOMAIN') &&
+                   (subDomainErr?.code === 'FORBIDDEN_CLIENT_DOMAIN') &&
+                   (gateDomainErr?.code === 'FORBIDDEN_CLIENT_DOMAIN');
+
+    results.push({
+      testNumber: 180,
+      name: 'safety_gate_client_never_uses_castlink_world_domain (Cliente nunca pode usar castlink.world)',
+      expected: 'FORBIDDEN_CLIENT_DOMAIN',
+      actual: `domain: ${clientDomainErr?.code} | sub: ${subDomainErr?.code} | gate: ${gateDomainErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 181 (GATE SEGURO - Req 7): safety_gate_client_never_uses_previews_garimpo_as_repo
+  // cliente nunca pode usar previews-garimpo como repositório
+  // --------------------------------------------------------------------------
+  {
+    let targetErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'paulo80522-wq/previews-garimpo',
+        targetBranch: 'main'
+      }, 'cliente-eta');
+    } catch (e) {
+      targetErr = e;
+    }
+
+    let gateTargetErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-eta', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-eta/previews-garimpo'
+      });
+    } catch (e) {
+      gateTargetErr = e;
+    }
+
+    const passed = (targetErr?.code === 'FORBIDDEN_TARGET_REPOSITORY') &&
+                   (gateTargetErr?.code === 'FORBIDDEN_TARGET_REPOSITORY');
+
+    results.push({
+      testNumber: 181,
+      name: 'safety_gate_client_never_uses_previews_garimpo_as_repo (Cliente nunca usa previews-garimpo como repositório)',
+      expected: 'FORBIDDEN_TARGET_REPOSITORY',
+      actual: `targetErr: ${targetErr?.code} | gateTargetErr: ${gateTargetErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 182 (GATE SEGURO - Req 8): safety_gate_client_never_points_to_castlink_world
+  // cliente nunca pode apontar para castlink-world
+  // --------------------------------------------------------------------------
+  {
+    let targetErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-theta/castlink-world',
+        targetBranch: 'main'
+      }, 'cliente-theta');
+    } catch (e) {
+      targetErr = e;
+    }
+
+    let gateTargetErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-theta', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'castlink-world/repo'
+      });
+    } catch (e) {
+      gateTargetErr = e;
+    }
+
+    const passed = (targetErr?.code === 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET') &&
+                   (gateTargetErr?.code === 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET');
+
+    results.push({
+      testNumber: 182,
+      name: 'safety_gate_client_never_points_to_castlink_world (Cliente nunca aponta para castlink-world)',
+      expected: 'FORBIDDEN_LAB_INFRASTRUCTURE_TARGET',
+      actual: `target: ${targetErr?.code} | gate: ${gateTargetErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 183 (GATE SEGURO - Req 9): safety_gate_client_requires_own_repository
+  // cliente precisa de repositório próprio
+  // --------------------------------------------------------------------------
+  {
+    let missingRepoErr = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetBranch: 'main'
+      }, 'cliente-iota');
+    } catch (e) {
+      missingRepoErr = e;
+    }
+
+    let gateMissingErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-iota', 'v1', {
+        provider: 'GITHUB_PAGES',
+        configured: true
+      });
+    } catch (e) {
+      gateMissingErr = e;
+    }
+
+    let emptyRepoErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-iota', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: ''
+      });
+    } catch (e) {
+      emptyRepoErr = e;
+    }
+
+    const passed = (missingRepoErr?.code === 'MISSING_TARGET_REPOSITORY') &&
+                   (gateMissingErr?.code === 'MISSING_TARGET_REPOSITORY') &&
+                   (emptyRepoErr?.code === 'MISSING_TARGET_REPOSITORY');
+
+    results.push({
+      testNumber: 183,
+      name: 'safety_gate_client_requires_own_repository (Cliente exige repositório próprio)',
+      expected: 'MISSING_TARGET_REPOSITORY',
+      actual: `targetMissing: ${missingRepoErr?.code} | gateMissing: ${gateMissingErr?.code} | emptyRepo: ${emptyRepoErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 184 (GATE SEGURO - Req 10): safety_gate_protected_domain_rejected_before_any_write
+  // domínio protegido é rejeitado antes de qualquer escrita
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-184-'));
+    registerProtectedDomain('dominio-ultra-blindado.com.br');
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-blindada', 'v1', { approved: true, includeScript: true });
+      executeBuildSite('empresa-blindada', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-blindada', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-blindada', true, { baseDir: tempDir, version: 'v1' });
+
+      let gateErr = null;
+      try {
+        assertPublicationSafetyGate('empresa-blindada', 'v1', {
+          provider: 'GITHUB_PAGES',
+          targetRepository: 'empresa-blindada/site',
+          customDomain: 'dominio-ultra-blindado.com.br'
+        });
+      } catch (e) {
+        gateErr = e;
+      }
+
+      let execErr = null;
+      try {
+        executeControlledPublication('empresa-blindada', 'v1', {
+          baseDir: tempDir,
+          publicationTarget: {
+            provider: 'GITHUB_PAGES',
+            targetRepository: 'empresa-blindada/site',
+            customDomain: 'dominio-ultra-blindado.com.br'
+          }
+        });
+      } catch (e) {
+        execErr = e;
+      }
+
+      const lockCreated = fs.existsSync(path.join(tempDir, 'empresa-blindada', '.publication.lock'));
+      const cnameCreated = fs.existsSync(path.join(tempDir, 'empresa-blindada', 'site-producao', 'CNAME'));
+
+      const passed = (gateErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN') &&
+                     (execErr?.code === 'PROTECTED_DOMAIN_FORBIDDEN') &&
+                     (!lockCreated) &&
+                     (!cnameCreated);
+
+      results.push({
+        testNumber: 184,
+        name: 'safety_gate_protected_domain_rejected_before_any_write (Domínio protegido rejeitado antes de qualquer escrita)',
+        expected: 'PROTECTED_DOMAIN_FORBIDDEN e zero arquivos gravados',
+        actual: `gate: ${gateErr?.code} | exec: ${execErr?.code} | lock: ${lockCreated} | cname: ${cnameCreated}`,
+        passed
+      });
+    } finally {
+      clearProtectedDomains();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 185 (GATE SEGURO - Req 11): safety_gate_ambiguous_operation_rejected
+  // operação ambígua é rejeitada (PUBLICATION_CONTEXT_AMBIGUOUS)
+  // --------------------------------------------------------------------------
+  {
+    // A: flag explícita de contexto ambíguo
+    let ambigContextErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', {}, { ambiguousContext: true });
+    } catch (e) {
+      ambigContextErr = e;
+    }
+
+    // B: divergência de slug do projeto
+    let slugMismatchErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', {}, { projectSlug: 'cliente-lambda' });
+    } catch (e) {
+      slugMismatchErr = e;
+    }
+
+    // C: conflito de ambiente (lab declarado como cliente)
+    let envConflictErr = null;
+    try {
+      assertPublicationSafetyGate('castlink-world', 'v2', {}, { environment: ENVIRONMENT_TYPES.CLIENT_PROJECT });
+    } catch (e) {
+      envConflictErr = e;
+    }
+
+    // D: ambiguidade de ownership do repositório
+    let ownerMismatchErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'empresa-x/site'
+      }, { expectedOwner: 'empresa-y' });
+    } catch (e) {
+      ownerMismatchErr = e;
+    }
+
+    // E: CNAME requerido sem domínio fornecido
+    let cnameNoDomainErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', {
+        cnameRequired: true,
+        customDomain: null
+      });
+    } catch (e) {
+      cnameNoDomainErr = e;
+    }
+
+    // F: ambiguidade de credenciais
+    let credsAmbigErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', {}, { credentialsAmbiguous: true });
+    } catch (e) {
+      credsAmbigErr = e;
+    }
+
+    // G: ambiguidade de ownership de domínio
+    let domainOwnerErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-kappa', 'v1', { customDomain: 'cliente.com.br' }, { domainOwnershipAmbiguous: true });
+    } catch (e) {
+      domainOwnerErr = e;
+    }
+
+    const passed = (ambigContextErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (slugMismatchErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (envConflictErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (ownerMismatchErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (cnameNoDomainErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (credsAmbigErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS') &&
+                   (domainOwnerErr?.code === 'PUBLICATION_CONTEXT_AMBIGUOUS');
+
+    results.push({
+      testNumber: 185,
+      name: 'safety_gate_ambiguous_operation_rejected (Operações ambíguas rejeitadas por PUBLICATION_CONTEXT_AMBIGUOUS)',
+      expected: 'PUBLICATION_CONTEXT_AMBIGUOUS para todas as 7 condições ambíguas',
+      actual: `ambigContext: ${ambigContextErr?.code} | slugMismatch: ${slugMismatchErr?.code} | envConflict: ${envConflictErr?.code} | owner: ${ownerMismatchErr?.code} | cnameNoDomain: ${cnameNoDomainErr?.code} | creds: ${credsAmbigErr?.code} | domainOwner: ${domainOwnerErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 186 (GATE SEGURO - Req 12): safety_gate_real_publication_remains_impossible
+  // publicação real continua impossível (PRODUCTION_PUBLICATION_EXECUTION_DISABLED)
+  // --------------------------------------------------------------------------
+  {
+    let gateDryRunErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-mu', 'v1', {}, { dryRun: false });
+    } catch (e) {
+      gateDryRunErr = e;
+    }
+
+    let gateRealErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-mu', 'v1', {}, { executeReal: true });
+    } catch (e) {
+      gateRealErr = e;
+    }
+
+    let execRealErr = null;
+    try {
+      executeControlledPublication('cliente-mu', 'v1', { dryRun: false });
+    } catch (e) {
+      execRealErr = e;
+    }
+
+    let publishFuncErr = null;
+    try {
+      publishProductionSite();
+    } catch (e) {
+      publishFuncErr = e;
+    }
+
+    const passed = (gateDryRunErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                   (gateRealErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                   (execRealErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                   (publishFuncErr?.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED');
+
+    results.push({
+      testNumber: 186,
+      name: 'safety_gate_real_publication_remains_impossible (Publicação real permanece categoricamente impossível)',
+      expected: 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+      actual: `gateDryRun: ${gateDryRunErr?.code} | gateReal: ${gateRealErr?.code} | execReal: ${execRealErr?.code} | publishFunc: ${publishFuncErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 187 (GATE SEGURO - Req 10b): safety_gate_unauthorized_destination_rejected
+  // destino não autorizado é rejeitado (UNAUTHORIZED_TARGET_DESTINATION)
+  // --------------------------------------------------------------------------
+  {
+    let unauthListErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-nu', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-nu/repo-estranho'
+      }, {
+        authorizedDestinations: ['cliente-nu/repo-autorizado-oficial']
+      });
+    } catch (e) {
+      unauthListErr = e;
+    }
+
+    let unauthFlagErr = null;
+    try {
+      assertPublicationSafetyGate('cliente-nu', 'v1', {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-nu/repo-autorizado-oficial'
+      }, {
+        destinationAuthorized: false
+      });
+    } catch (e) {
+      unauthFlagErr = e;
+    }
+
+    const passed = (unauthListErr?.code === 'UNAUTHORIZED_TARGET_DESTINATION') &&
+                   (unauthFlagErr?.code === 'UNAUTHORIZED_TARGET_DESTINATION');
+
+    results.push({
+      testNumber: 187,
+      name: 'safety_gate_unauthorized_destination_rejected (Destino não autorizado rejeitado por UNAUTHORIZED_TARGET_DESTINATION)',
+      expected: 'UNAUTHORIZED_TARGET_DESTINATION',
+      actual: `unauthList: ${unauthListErr?.code} | unauthFlag: ${unauthFlagErr?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 188 (GATE SEGURO - Req 16b): safety_gate_real_castlink_domain_not_identified_status
+  // Status REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED preservado sem presunção de domínio
+  // --------------------------------------------------------------------------
+  {
+    const status = getRealCastLinkDomainStatus();
+    const isNotIdentified = (status === 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED') &&
+                            (REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED === 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED') &&
+                            (REAL_CASTLINK_DOMAIN_STATUS === 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED');
+
+    // PROTECTED_DOMAINS não contém domínios presumidos nem inventados
+    const initialDomains = getProtectedDomains();
+    const noPresumedDomain = !initialDomains.includes('castlink.world') && initialDomains.length === 0;
+
+    const passed = isNotIdentified && noPresumedDomain;
+
+    results.push({
+      testNumber: 188,
+      name: 'safety_gate_real_castlink_domain_not_identified_status (Status REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED preservado)',
+      expected: 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED e PROTECTED_DOMAINS vazio sem presunções',
+      actual: `status: ${status} | initialDomainsCount: ${initialDomains.length} | noPresumed: ${noPresumedDomain}`,
+      passed
     });
   }
 
