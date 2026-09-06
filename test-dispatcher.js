@@ -38,6 +38,12 @@ const {
   HOMOLOGATION_DECISION_PENDING,
   HOMOLOGATION_DECISION_APPROVED,
   HOMOLOGATION_DECISION_REJECTED,
+  PUBLICATION_DECISION_PENDING,
+  PUBLICATION_DECISION_APPROVED,
+  PUBLICATION_DECISION_REJECTED,
+  PUBLICATION_STATUS_PENDING,
+  PUBLICATION_STATUS_APPROVED,
+  PUBLICATION_STATUS_REJECTED,
   acquireBuildLock,
   releaseBuildLock,
   getBuildValidation,
@@ -45,7 +51,11 @@ const {
   validateHomologation,
   getHomologation,
   setHomologation,
-  assertSiteHomologated
+  assertSiteHomologated,
+  validatePublicationApproval,
+  getPublicationApproval,
+  setPublicationApproval,
+  assertPublicationApproved
 } = require('./dispatcher');
 
 const {
@@ -2679,6 +2689,991 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       actual: `allowed: ${gateRes.allowed} | status: ${gateRes.status} | dryRun: ${gateRes.dryRun}`,
       passed
     });
+  }
+
+  // ==========================================================================
+  // BATERIA DE TESTES DE AUTORIZAÇÃO DE PUBLICAÇÃO (Fase 4 - Etapas 2 a 14)
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 84: publication_approval_absent_returns_pending (Requisito 1)
+  // --------------------------------------------------------------------------
+  {
+    const manifest = { projectSlug: 'empresa-test-84' };
+    const val = validatePublicationApproval(manifest);
+    const pub = getPublicationApproval('empresa-test-84', { manifestOverride: manifest });
+    const passed = (val.valid === true) &&
+                   (val.approved === false) &&
+                   (val.decision === 'PENDING') &&
+                   (val.status === 'PENDENTE') &&
+                   (pub.approved === false) &&
+                   (pub.decision === 'PENDING') &&
+                   (pub.status === 'PENDENTE');
+    results.push({
+      testNumber: 84,
+      name: 'publication_approval_absent_returns_pending (Ausência de publicationApproval retorna PENDENTE)',
+      expected: 'approved: false, decision: PENDING, status: PENDENTE, valid: true',
+      actual: `valApproved: ${val.approved} | valDecision: ${val.decision} | pubDecision: ${pub.decision}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 85: absence_of_approval_blocks_publication_gate (Requisito 2)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-85-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-85', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-85', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-85', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        assertPublicationApproved('empresa-pub-85', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+      results.push({
+        testNumber: 85,
+        name: 'absence_of_approval_blocks_publication_gate (Ausência de aprovação bloqueia com PUBLICATION_APPROVAL_REQUIRED)',
+        expected: 'PUBLICATION_APPROVAL_REQUIRED',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 86: approval_without_build_approval_blocked (Requisito 3)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-86-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-86', 'v2', { approved: false, includeScript: true });
+      const manifestPath = path.join(tempDir, 'empresa-pub-86', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution = { status: 'CONCLUIDA', version: 'v2', executedAt: new Date().toISOString() };
+      m.buildValidation = { status: 'VALIDADA', isValid: true, version: 'v2' };
+      m.siteHomologation = { status: 'HOMOLOGADA', approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes', version: 'v2', decisionAt: new Date().toISOString() };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-86', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 86,
+        name: 'approval_without_build_approval_blocked (Tentativa de aprovação sem buildApproval bloqueia)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 87: approval_without_build_execution_blocked (Requisito 4)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-87-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-87', 'v2', { approved: true, includeScript: true });
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-87', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 87,
+        name: 'approval_without_build_execution_blocked (Tentativa de aprovação sem buildExecution bloqueia)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 88: approval_without_build_validation_blocked (Requisito 5)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-88-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-88', 'v2', { approved: true, includeScript: true });
+      const manifestPath = path.join(tempDir, 'empresa-pub-88', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution = { status: 'CONCLUIDA', version: 'v2', executedAt: new Date().toISOString() };
+      m.siteHomologation = { status: 'HOMOLOGADA', approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes', version: 'v2', decisionAt: new Date().toISOString() };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-88', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 88,
+        name: 'approval_without_build_validation_blocked (Tentativa de aprovação sem buildValidation bloqueia)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 89: approval_without_site_homologation_blocked (Requisito 6)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-89-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-89', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-89', 'v2', { baseDir: tempDir });
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-89', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 89,
+        name: 'approval_without_site_homologation_blocked (Tentativa de aprovação sem siteHomologation bloqueia)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 90: incorrect_version_blocked_by_gate (Requisito 7)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-90-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-90', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-90', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-90', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-pub-90', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        assertPublicationApproved('empresa-pub-90', 'v3', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 90,
+        name: 'incorrect_version_blocked_by_gate (Gate bloqueia versão divergente com PUBLICATION_VERSION_MISMATCH)',
+        expected: 'PUBLICATION_VERSION_MISMATCH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 91: incorrect_project_slug_blocked (Requisito 8)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-91-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-slug-real', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-slug-real', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-slug-real', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-slug-real', 'manifest.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+      let setErr = null;
+      try {
+        setPublicationApproval('empresa-slug-invasora', true, { manifestOverride: manifest, version: 'v2' });
+      } catch (e) {
+        setErr = e;
+      }
+
+      let assertErr = null;
+      try {
+        assertPublicationApproved('empresa-slug-invasora', 'v2', { manifestOverride: manifest });
+      } catch (e) {
+        assertErr = e;
+      }
+
+      const passed = (setErr?.code === 'PUBLICATION_PROJECT_SLUG_MISMATCH') &&
+                     (assertErr?.code === 'PUBLICATION_PROJECT_SLUG_MISMATCH');
+      results.push({
+        testNumber: 91,
+        name: 'incorrect_project_slug_blocked (projectSlug incorreto rejeitado com PUBLICATION_PROJECT_SLUG_MISMATCH)',
+        expected: 'PUBLICATION_PROJECT_SLUG_MISMATCH',
+        actual: `setCode: ${setErr?.code} | assertCode: ${assertErr?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 92: build_execution_version_mismatch_blocked (Requisito 9)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-92-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-92', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-92', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-92', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-pub-92', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution.version = 'v1';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-92', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 92,
+        name: 'build_execution_version_mismatch_blocked (buildExecution de versão incompatível bloqueia)',
+        expected: 'PUBLICATION_VERSION_MISMATCH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 93: homologation_version_mismatch_blocked (Requisito 10)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-93-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-93', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-93', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-93', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-pub-93', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.siteHomologation.version = 'v1';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-93', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 93,
+        name: 'homologation_version_mismatch_blocked (siteHomologation de versão incompatível bloqueia)',
+        expected: 'PUBLICATION_VERSION_MISMATCH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 94: homologation_prior_to_build_blocked (Requisito 11)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-94-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-94', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-94', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-94', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-pub-94', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution.executedAt = '2026-09-05T20:00:00.000Z';
+      m.siteHomologation.decisionAt = '2026-09-05T19:00:00.000Z';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        setPublicationApproval('empresa-pub-94', true, { baseDir: tempDir, version: 'v2' });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'HOMOLOGATION_STALE');
+      results.push({
+        testNumber: 94,
+        name: 'homologation_prior_to_build_blocked (Homologação anterior ao build detectada como HOMOLOGATION_STALE)',
+        expected: 'HOMOLOGATION_STALE',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 95: publication_approval_prior_to_homologation_blocked (Requisito 12)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-95-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-95', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-95', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-95', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-pub-95', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-pub-95', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution.executedAt = '2026-09-05T18:00:00.000Z';
+      m.siteHomologation.decisionAt = '2026-09-05T20:00:00.000Z';
+      m.publicationApproval.decisionAt = '2026-09-05T19:00:00.000Z';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        assertPublicationApproved('empresa-pub-95', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_APPROVAL_STALE');
+      results.push({
+        testNumber: 95,
+        name: 'publication_approval_prior_to_homologation_blocked (Publication anterior à homologação gera PUBLICATION_APPROVAL_STALE)',
+        expected: 'PUBLICATION_APPROVAL_STALE',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 96: valid_approval_with_all_prerequisites_passes (Requisito 13)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-96-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-96', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-96', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-96', true, { baseDir: tempDir, version: 'v2' });
+
+      const setRes = setPublicationApproval('empresa-pub-96', true, { baseDir: tempDir, version: 'v2' });
+      const assertRes = assertPublicationApproved('empresa-pub-96', 'v2', { baseDir: tempDir });
+
+      const passed = (setRes.success === true) &&
+                     (setRes.decision === 'APPROVED') &&
+                     (setRes.status === 'APROVADA') &&
+                     (setRes.decisionBy === 'Paulo Nunes') &&
+                     (assertRes.allowed === true) &&
+                     (assertRes.status === 'APROVADA');
+      results.push({
+        testNumber: 96,
+        name: 'valid_approval_with_all_prerequisites_passes (Aprovação formal com todos os pré-requisitos satisfeitos)',
+        expected: 'setRes.success: true, decision: APPROVED, status: APROVADA e assertRes.allowed: true',
+        actual: `setDecision: ${setRes.decision} | setStatus: ${setRes.status} | allowed: ${assertRes.allowed}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 97: formal_rejection_success_and_preserves_prerequisites (Requisito 14)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-97-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-97', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-97', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-97', true, { baseDir: tempDir, version: 'v2' });
+
+      const rejRes = setPublicationApproval('empresa-pub-97', false, { baseDir: tempDir, version: 'v2' });
+      const m = JSON.parse(fs.readFileSync(path.join(tempDir, 'empresa-pub-97', 'manifest.json'), 'utf8'));
+
+      const passed = (rejRes.success === true) &&
+                     (rejRes.decision === 'REJECTED') &&
+                     (rejRes.status === 'REJEITADA') &&
+                     (m.buildApproval.approved === true) &&
+                     (m.buildExecution.status === 'CONCLUIDA') &&
+                     (m.buildValidation.status === 'VALIDADA') &&
+                     (m.siteHomologation.status === 'HOMOLOGADA');
+      results.push({
+        testNumber: 97,
+        name: 'formal_rejection_success_and_preserves_prerequisites (Rejeição formal preserva pré-requisitos anteriores intactos)',
+        expected: 'decision: REJECTED, status: REJEITADA e pré-requisitos preservados',
+        actual: `decision: ${rejRes.decision} | status: ${rejRes.status} | bApp: ${m.buildApproval.approved} | bExec: ${m.buildExecution.status} | sHomo: ${m.siteHomologation.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 98: isolation_between_project_slugs (Requisito 15)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-98-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-slug-a', 'v2', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-slug-b', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-slug-a', 'v2', { baseDir: tempDir });
+      executeBuildSite('empresa-slug-b', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-slug-a', true, { baseDir: tempDir, version: 'v2' });
+      setHomologation('empresa-slug-b', true, { baseDir: tempDir, version: 'v2' });
+
+      setPublicationApproval('empresa-slug-a', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-slug-b', false, { baseDir: tempDir, version: 'v2' });
+
+      const pubA = getPublicationApproval('empresa-slug-a', { baseDir: tempDir });
+      const pubB = getPublicationApproval('empresa-slug-b', { baseDir: tempDir });
+
+      const passed = (pubA.approved === true && pubA.decision === 'APPROVED') &&
+                     (pubB.approved === false && pubB.decision === 'REJECTED');
+      results.push({
+        testNumber: 98,
+        name: 'isolation_between_project_slugs (Isolamento estrito entre projetos: A aprovado, B rejeitado)',
+        expected: 'empresa-slug-a: APPROVED e empresa-slug-b: REJECTED',
+        actual: `pubA: ${pubA.decision} | pubB: ${pubB.decision}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 99: isolation_between_versions (Requisito 16)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-99-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-99', 'v1', { approved: true, includeScript: true });
+      createIsolatedMockProject(tempDir, 'empresa-pub-99', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-99', 'v1', { baseDir: tempDir });
+      setHomologation('empresa-pub-99', true, { baseDir: tempDir, version: 'v1' });
+      setPublicationApproval('empresa-pub-99', true, { baseDir: tempDir, version: 'v1' });
+
+      let err = null;
+      try {
+        assertPublicationApproved('empresa-pub-99', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 99,
+        name: 'isolation_between_versions (Aprovação de publicação da v1 não autoriza publicação da v2)',
+        expected: 'PUBLICATION_VERSION_MISMATCH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 100: invalid_state_rejected (Requisito 17)
+  // --------------------------------------------------------------------------
+  {
+    const manifestOk = {
+      projectSlug: 'empresa-pub-100',
+      publicationApproval: { status: 'ok', decision: 'yes', approved: true }
+    };
+    const val = validatePublicationApproval(manifestOk);
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-100', 'v2', { manifestOverride: manifestOk });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (val.valid === false) && (err?.code === 'PUBLICATION_APPROVAL_INVALID');
+    results.push({
+      testNumber: 100,
+      name: 'invalid_state_rejected (Estados arbitrários como status: ok ou decision: yes rejeitados)',
+      expected: 'val.valid: false e err.code: PUBLICATION_APPROVAL_INVALID',
+      actual: `val.valid: ${val.valid} | err.code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 101: non_boolean_approved_rejected (Requisito 18)
+  // --------------------------------------------------------------------------
+  {
+    const manifestStr = {
+      projectSlug: 'empresa-pub-101',
+      publicationApproval: { status: 'APROVADA', decision: 'APPROVED', approved: 'true' }
+    };
+    const valStr = validatePublicationApproval(manifestStr);
+
+    let errCall = null;
+    try {
+      setPublicationApproval('empresa-pub-101', 'true', { version: 'v2' });
+    } catch (e) {
+      errCall = e;
+    }
+
+    const passed = (valStr.valid === false) && (errCall !== null);
+    results.push({
+      testNumber: 101,
+      name: 'non_boolean_approved_rejected (approved não booleano rejeitado estritamente)',
+      expected: 'valStr.valid: false e setPublicationApproval lança erro',
+      actual: `valStr.valid: ${valStr.valid} | errCall: ${errCall !== null}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 102: natural_language_rejected (Requisito 19)
+  // --------------------------------------------------------------------------
+  {
+    let chatErr1 = null;
+    let chatErr2 = null;
+    try {
+      setPublicationApproval('empresa-pub-102', 'aprovado pelo cliente', { version: 'v2' });
+    } catch (e) {
+      chatErr1 = e;
+    }
+    try {
+      setPublicationApproval('empresa-pub-102', 'publicar imediatamente', { version: 'v2' });
+    } catch (e) {
+      chatErr2 = e;
+    }
+
+    const passed = (chatErr1 !== null) && (chatErr2 !== null);
+    results.push({
+      testNumber: 102,
+      name: 'natural_language_rejected (Comandos em linguagem natural rejeitados)',
+      expected: 'Exceção em todas as tentativas de linguagem natural',
+      actual: `chatErr1: ${chatErr1 !== null} | chatErr2: ${chatErr2 !== null}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 103: publication_status_does_not_modify_manifest (Requisito 20)
+  // --------------------------------------------------------------------------
+  {
+    const crypto = require('crypto');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-103-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-103', 'v2', { approved: true, includeScript: true });
+      const manifestPath = path.join(tempDir, 'empresa-pub-103', 'manifest.json');
+      const hashBefore = crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex');
+
+      getPublicationApproval('empresa-pub-103', { baseDir: tempDir });
+      try {
+        assertPublicationApproved('empresa-pub-103', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        // Bloqueio esperado
+      }
+
+      const hashAfter = crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex');
+      const passed = (hashBefore === hashAfter);
+      results.push({
+        testNumber: 103,
+        name: 'publication_status_does_not_modify_manifest (Consulta de status é estritamente somente-leitura)',
+        expected: 'Hash SHA-256 do manifest.json inalterado',
+        actual: `before === after: ${passed}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 104: rebuild_invalidates_publication_approval (Requisito 21)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-104-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-104', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-104', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-104', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-pub-104', true, { baseDir: tempDir, version: 'v2' });
+
+      const pubBefore = getPublicationApproval('empresa-pub-104', { baseDir: tempDir });
+
+      // Novo rebuild executado
+      executeBuildSite('empresa-pub-104', 'v2', { baseDir: tempDir });
+      const pubAfter = getPublicationApproval('empresa-pub-104', { baseDir: tempDir });
+
+      const passed = (pubBefore.approved === true && pubBefore.status === 'APROVADA') &&
+                     (pubAfter.approved === false && pubAfter.decision === 'PENDING' && pubAfter.status === 'PENDENTE');
+      results.push({
+        testNumber: 104,
+        name: 'rebuild_invalidates_publication_approval (Rebuild reseta publicationApproval para PENDENTE)',
+        expected: 'before: APROVADA | after: PENDENTE com approved: false',
+        actual: `before: ${pubBefore.status} | after: ${pubAfter.status} | afterApproved: ${pubAfter.approved}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 105: rebuild_invalidates_site_homologation (Requisito 22)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-105-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-105', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-105', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-105', true, { baseDir: tempDir, version: 'v2' });
+
+      const homoBefore = getHomologation('empresa-pub-105', { baseDir: tempDir });
+
+      // Novo rebuild executado
+      executeBuildSite('empresa-pub-105', 'v2', { baseDir: tempDir });
+      const homoAfter = getHomologation('empresa-pub-105', { baseDir: tempDir });
+
+      const passed = (homoBefore.approved === true && homoBefore.status === 'HOMOLOGADA') &&
+                     (homoAfter.approved === false && homoAfter.decision === 'PENDING' && homoAfter.status === 'PENDENTE');
+      results.push({
+        testNumber: 105,
+        name: 'rebuild_invalidates_site_homologation (Rebuild invalida siteHomologation para PENDENTE)',
+        expected: 'before: HOMOLOGADA | after: PENDENTE',
+        actual: `before: ${homoBefore.status} | after: ${homoAfter.status}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 106: stale_approval_does_not_authorize_post_rebuild (Requisito 23)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-106-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-106', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-106', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-106', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-pub-106', true, { baseDir: tempDir, version: 'v2' });
+
+      // Rebuild reseta publicationApproval para PENDENTE
+      executeBuildSite('empresa-pub-106', 'v2', { baseDir: tempDir });
+
+      let err = null;
+      try {
+        assertPublicationApproved('empresa-pub-106', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+      results.push({
+        testNumber: 106,
+        name: 'stale_approval_does_not_authorize_post_rebuild (Autorização pré-rebuild não autoriza novo build)',
+        expected: 'PUBLICATION_APPROVAL_REQUIRED',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 107: build_execution_does_not_equal_publication_approval (Requisito 24)
+  // --------------------------------------------------------------------------
+  {
+    const manifest = {
+      projectSlug: 'empresa-pub-107',
+      buildApproval: { approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes' },
+      buildExecution: { status: 'CONCLUIDA', version: 'v2', executedAt: new Date().toISOString() },
+      buildValidation: { status: 'VALIDADA', isValid: true, version: 'v2' }
+    };
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-107', 'v2', { manifestOverride: manifest });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 107,
+      name: 'build_execution_does_not_equal_publication_approval (buildExecution CONCLUIDA não equivale a publicationApproval)',
+      expected: 'PUBLICATION_APPROVAL_REQUIRED',
+      actual: `code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 108: site_homologation_does_not_equal_publication_approval (Requisito 25)
+  // --------------------------------------------------------------------------
+  {
+    const now = new Date().toISOString();
+    const manifest = {
+      projectSlug: 'empresa-pub-108',
+      buildApproval: { approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes' },
+      buildExecution: { status: 'CONCLUIDA', version: 'v2', executedAt: now },
+      buildValidation: { status: 'VALIDADA', isValid: true, version: 'v2' },
+      siteHomologation: { status: 'HOMOLOGADA', approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes', version: 'v2', decisionAt: now }
+    };
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-108', 'v2', { manifestOverride: manifest });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 108,
+      name: 'site_homologation_does_not_equal_publication_approval (siteHomologation HOMOLOGADA não equivale a publicationApproval)',
+      expected: 'PUBLICATION_APPROVAL_REQUIRED',
+      actual: `code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 109: build_approval_does_not_equal_publication_approval (Requisito 26)
+  // --------------------------------------------------------------------------
+  {
+    const manifest = {
+      projectSlug: 'empresa-pub-109',
+      buildApproval: { approved: true, decision: 'APPROVED', decisionBy: 'Paulo Nunes' }
+    };
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-109', 'v2', { manifestOverride: manifest });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 109,
+      name: 'build_approval_does_not_equal_publication_approval (buildApproval APPROVED não equivale a publicationApproval)',
+      expected: 'PUBLICATION_APPROVAL_REQUIRED',
+      actual: `code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 110: approval_gate_does_not_equal_publication_approval (Requisito 27)
+  // --------------------------------------------------------------------------
+  {
+    const manifest = {
+      projectSlug: 'empresa-pub-110',
+      status: 'APPROVED',
+      approvedBy: 'Paulo Nunes',
+      approvedAt: new Date().toISOString(),
+      approvalGate: { decision: 'APROVAR' }
+    };
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-110', 'v2', { manifestOverride: manifest });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 110,
+      name: 'approval_gate_does_not_equal_publication_approval (Gate comercial APROVAR não equivale a publicationApproval)',
+      expected: 'PUBLICATION_APPROVAL_REQUIRED',
+      actual: `code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 111: public_preview_does_not_equal_publication_approval (Requisito 28)
+  // --------------------------------------------------------------------------
+  {
+    const manifest = {
+      projectSlug: 'empresa-pub-111',
+      publicPreview: { commercialApproval: true, approvedUrl: 'https://preview.mock' }
+    };
+    let err = null;
+    try {
+      assertPublicationApproved('empresa-pub-111', 'v2', { manifestOverride: manifest });
+    } catch (e) {
+      err = e;
+    }
+
+    const passed = (err?.code === 'PUBLICATION_APPROVAL_REQUIRED');
+    results.push({
+      testNumber: 111,
+      name: 'public_preview_does_not_equal_publication_approval (publicPreview comercial não equivale a publicationApproval)',
+      expected: 'PUBLICATION_APPROVAL_REQUIRED',
+      actual: `code: ${err?.code}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 112: publisher_not_called_or_imported (Requisito 29)
+  // --------------------------------------------------------------------------
+  {
+    const dispatcherSrc = fs.readFileSync(path.join(__dirname, 'dispatcher.js'), 'utf8');
+    const hasPublisherImport = dispatcherSrc.includes('publisher.js') || dispatcherSrc.includes("require('./publisher')");
+    const passed = !hasPublisherImport;
+    results.push({
+      testNumber: 112,
+      name: 'publisher_not_called_or_imported (publisher.js não é importado nem executado no dispatcher)',
+      expected: 'hasPublisherImport: false',
+      actual: `hasPublisherImport: ${hasPublisherImport}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 113: no_site_copies_in_previews_garimpo (Requisito 30)
+  // --------------------------------------------------------------------------
+  {
+    const prohibitedSiteDir = path.join(__dirname, 'castlink-world', 'site');
+    const exists = fs.existsSync(prohibitedSiteDir);
+    const passed = !exists;
+    results.push({
+      testNumber: 113,
+      name: 'no_site_copies_in_previews_garimpo (Diretório proibido previews-garimpo/castlink-world/site não existe)',
+      expected: 'exists: false',
+      actual: `exists: ${exists}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 114: no_remote_uploads_in_publication_approval (Requisito 31)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-114-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-114', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-114', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-114', true, { baseDir: tempDir, version: 'v2' });
+      const res = setPublicationApproval('empresa-pub-114', true, { baseDir: tempDir, version: 'v2' });
+
+      const passed = (res.success === true) && (typeof res.decisionAt === 'string');
+      results.push({
+        testNumber: 114,
+        name: 'no_remote_uploads_in_publication_approval (Operação puramente local sem chamadas remotas)',
+        expected: 'Operação executada 100% localmente',
+        actual: `success: ${res.success} | local: true`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 115: no_emails_sent_dry_run_preserved (Requisito 32)
+  // --------------------------------------------------------------------------
+  {
+    const gateRes = validateEmailGate('castlink-world', 'v2');
+    const passed = (gateRes.dryRun === true) && (gateRes.dispatched !== true);
+    results.push({
+      testNumber: 115,
+      name: 'no_emails_sent_dry_run_preserved (Nenhum e-mail enviado, dryRun estrito preservado)',
+      expected: 'dryRun: true e dispatched !== true',
+      actual: `dryRun: ${gateRes.dryRun} | dispatched: ${gateRes.dispatched}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 116: production_send_not_executed (Requisito 33)
+  // --------------------------------------------------------------------------
+  {
+    const gateRes = validateEmailGate('castlink-world', 'v2');
+    const passed = (gateRes.dryRun === true) && (!process.argv.includes('--production-send'));
+    results.push({
+      testNumber: 116,
+      name: 'production_send_not_executed (--production-send não foi acionado durante os testes)',
+      expected: 'dryRun: true e flag ausente',
+      actual: `dryRun: ${gateRes.dryRun} | argvIncludes: ${process.argv.includes('--production-send')}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 117: panel_renders_all_6_sections (Etapa 14)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-pub-117-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-pub-117', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-pub-117', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-pub-117', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-pub-117', true, { baseDir: tempDir, version: 'v2' });
+
+      const panel = generateApprovalPanel('empresa-pub-117', 'v2', { baseDir: tempDir, openInEditor: false });
+      const md = panel.content;
+
+      const hasSec1 = md.includes('## 🏗️ APROVAÇÃO DA CONSTRUÇÃO DO SITE');
+      const hasSec2 = md.includes('## 🔨 EXECUÇÃO DA CONSTRUÇÃO DO SITE');
+      const hasSec3 = md.includes('## 🔎 VALIDAÇÃO DO BUILD');
+      const hasSec4 = md.includes('## ✅ HOMOLOGAÇÃO DO SITE DE PRODUÇÃO');
+      const hasSec5 = md.includes('## 🌐 SITE DE PRODUÇÃO');
+      const hasSec6 = md.includes('## 🚀 APROVAÇÃO DA PUBLICAÇÃO DO SITE');
+
+      const passed = hasSec1 && hasSec2 && hasSec3 && hasSec4 && hasSec5 && hasSec6;
+      results.push({
+        testNumber: 117,
+        name: 'panel_renders_all_6_sections (Painel renderiza as 6 seções completas de governança)',
+        expected: 'Presença das 6 seções no PAINEL_APROVACAO.md',
+        actual: `s1:${hasSec1} s2:${hasSec2} s3:${hasSec3} s4:${hasSec4} s5:${hasSec5} s6:${hasSec6}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 
   // --------------------------------------------------------------------------

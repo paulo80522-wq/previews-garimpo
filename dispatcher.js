@@ -58,6 +58,16 @@ const HOMOLOGATION_DECISION_APPROVED = 'APPROVED';
 const HOMOLOGATION_DECISION_REJECTED = 'REJECTED';
 const VALID_HOMOLOGATION_DECISIONS = [HOMOLOGATION_DECISION_PENDING, HOMOLOGATION_DECISION_APPROVED, HOMOLOGATION_DECISION_REJECTED];
 
+const PUBLICATION_DECISION_PENDING = 'PENDING';
+const PUBLICATION_DECISION_APPROVED = 'APPROVED';
+const PUBLICATION_DECISION_REJECTED = 'REJECTED';
+const VALID_PUBLICATION_DECISIONS = [PUBLICATION_DECISION_PENDING, PUBLICATION_DECISION_APPROVED, PUBLICATION_DECISION_REJECTED];
+
+const PUBLICATION_STATUS_PENDING = 'PENDENTE';
+const PUBLICATION_STATUS_APPROVED = 'APROVADA';
+const PUBLICATION_STATUS_REJECTED = 'REJEITADA';
+const VALID_PUBLICATION_STATUSES = [PUBLICATION_STATUS_PENDING, PUBLICATION_STATUS_APPROVED, PUBLICATION_STATUS_REJECTED];
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -969,6 +979,19 @@ function executeBuildSite(projectSlug, version, options = {}) {
       notes: null
     };
 
+    // INVALIDAÇÃO DETERMINÍSTICA DE AUTORIZAÇÃO DE PUBLICAÇÃO (FASE 4):
+    // Qualquer novo build ou rebuild invalida a autorização de publicação anterior, retornando-a a PENDENTE.
+    manifest.publicationApproval = {
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: 'PENDENTE',
+      decisionBy: null,
+      decisionAt: null,
+      projectSlug: cleanSlug,
+      version: cleanVersion,
+      notes: null
+    };
+
     if (!options.manifestOverride && options.save !== false) {
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     }
@@ -1449,6 +1472,660 @@ function assertSiteHomologated(projectSlug, versionOrOptions = {}, maybeOptions 
 }
 
 /**
+ * Valida a estrutura formal de publicationApproval.
+ * Ausência do campo é tratada de forma estrita e segura como PENDENTE.
+ */
+function validatePublicationApproval(manifest) {
+  if (!manifest || typeof manifest !== 'object') {
+    return {
+      valid: true,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      decisionBy: null,
+      decisionAt: null,
+      projectSlug: null,
+      version: null,
+      notes: null
+    };
+  }
+
+  const pub = manifest.publicationApproval;
+  if (pub === undefined || pub === null) {
+    return {
+      valid: true,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      decisionBy: null,
+      decisionAt: null,
+      projectSlug: manifest.projectSlug || null,
+      version: null,
+      notes: null
+    };
+  }
+
+  if (typeof pub !== 'object' || Array.isArray(pub)) {
+    return {
+      valid: false,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      reason: 'Campo publicationApproval deve ser um objeto.'
+    };
+  }
+
+  // Validação estrita de tipo para approved (rejeita strings como "true", números como 1, etc.)
+  if (typeof pub.approved !== 'boolean') {
+    return {
+      valid: false,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      reason: `Tipo inválido para approved: '${typeof pub.approved}'. Esperado estritamente boolean.`
+    };
+  }
+
+  // Validação estrita de decision
+  if (typeof pub.decision !== 'string' || !VALID_PUBLICATION_DECISIONS.includes(pub.decision)) {
+    return {
+      valid: false,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      reason: `Decisão de publicação desconhecida ou em formato inválido: '${pub.decision}'.`
+    };
+  }
+
+  // Validação estrita de status
+  if (typeof pub.status !== 'string' || !VALID_PUBLICATION_STATUSES.includes(pub.status)) {
+    return {
+      valid: false,
+      approved: false,
+      decision: PUBLICATION_DECISION_PENDING,
+      status: PUBLICATION_STATUS_PENDING,
+      reason: `Status de publicação desconhecido ou em formato inválido: '${pub.status}'.`
+    };
+  }
+
+  // Validação de coerência entre approved, decision e status
+  if (pub.approved === true) {
+    if (pub.decision !== PUBLICATION_DECISION_APPROVED || pub.status !== PUBLICATION_STATUS_APPROVED) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: 'approved === true exige decision === APPROVED e status === APROVADA.'
+      };
+    }
+  } else {
+    if (pub.decision === PUBLICATION_DECISION_APPROVED || pub.status === PUBLICATION_STATUS_APPROVED) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: 'approved === false é incompatível com decision APPROVED ou status APROVADA.'
+      };
+    }
+  }
+
+  if (pub.decision === PUBLICATION_DECISION_PENDING && pub.status !== PUBLICATION_STATUS_PENDING) {
+    return {
+      valid: false,
+      approved: false,
+      decision: pub.decision,
+      status: pub.status,
+      reason: 'decision PENDING exige status PENDENTE.'
+    };
+  }
+
+  if (pub.decision === PUBLICATION_DECISION_REJECTED && pub.status !== PUBLICATION_STATUS_REJECTED) {
+    return {
+      valid: false,
+      approved: false,
+      decision: pub.decision,
+      status: pub.status,
+      reason: 'decision REJECTED exige status REJEITADA.'
+    };
+  }
+
+  // Validação de projectSlug
+  if (pub.projectSlug !== undefined && pub.projectSlug !== null) {
+    if (typeof pub.projectSlug !== 'string' || pub.projectSlug.trim() === '') {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: "Campo 'projectSlug' em publicationApproval deve ser uma string não vazia."
+      };
+    }
+    if (manifest.projectSlug && pub.projectSlug !== manifest.projectSlug) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: `projectSlug em publicationApproval ('${pub.projectSlug}') diverge de manifest.projectSlug ('${manifest.projectSlug}').`
+      };
+    }
+  }
+
+  // Validação de campos obrigatórios para aprovação formal
+  if (pub.decision === PUBLICATION_DECISION_APPROVED) {
+    if (pub.decisionBy !== REQUIRED_APPROVER) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: `Aprovação de publicação requer aprovador oficial '${REQUIRED_APPROVER}'.`
+      };
+    }
+    if (!pub.decisionAt || typeof pub.decisionAt !== 'string' || isNaN(new Date(pub.decisionAt).getTime())) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: "Aprovação de publicação requer timestamp ISO válido em 'decisionAt'."
+      };
+    }
+    if (!pub.version || typeof pub.version !== 'string') {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: "Aprovação de publicação requer versão vinculada em 'version'."
+      };
+    }
+    if (!pub.projectSlug || typeof pub.projectSlug !== 'string') {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: "Aprovação de publicação requer 'projectSlug' definido."
+      };
+    }
+
+    return {
+      valid: true,
+      approved: true,
+      decision: PUBLICATION_DECISION_APPROVED,
+      status: PUBLICATION_STATUS_APPROVED,
+      decisionBy: pub.decisionBy,
+      decisionAt: pub.decisionAt,
+      projectSlug: pub.projectSlug,
+      version: pub.version,
+      notes: pub.notes || null
+    };
+  }
+
+  // Validação de campos obrigatórios para rejeição formal
+  if (pub.decision === PUBLICATION_DECISION_REJECTED) {
+    if (!pub.decisionAt || typeof pub.decisionAt !== 'string' || isNaN(new Date(pub.decisionAt).getTime())) {
+      return {
+        valid: false,
+        approved: false,
+        decision: pub.decision,
+        status: pub.status,
+        reason: "Rejeição de publicação requer timestamp ISO válido em 'decisionAt'."
+      };
+    }
+    return {
+      valid: true,
+      approved: false,
+      decision: PUBLICATION_DECISION_REJECTED,
+      status: PUBLICATION_STATUS_REJECTED,
+      decisionBy: pub.decisionBy || REQUIRED_APPROVER,
+      decisionAt: pub.decisionAt,
+      projectSlug: pub.projectSlug || manifest.projectSlug || null,
+      version: pub.version || null,
+      notes: pub.notes || null
+    };
+  }
+
+  return {
+    valid: true,
+    approved: false,
+    decision: PUBLICATION_DECISION_PENDING,
+    status: PUBLICATION_STATUS_PENDING,
+    decisionBy: null,
+    decisionAt: null,
+    projectSlug: pub.projectSlug || manifest.projectSlug || null,
+    version: pub.version || null,
+    notes: pub.notes || null
+  };
+}
+
+/**
+ * Lê o estado de autorização de publicação de uma oportunidade (somente leitura).
+ */
+function getPublicationApproval(projectSlug, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      return {
+        approved: false,
+        decision: PUBLICATION_DECISION_PENDING,
+        status: PUBLICATION_STATUS_PENDING,
+        valid: true,
+        decisionBy: null,
+        decisionAt: null,
+        projectSlug: cleanSlug,
+        version: null,
+        notes: null
+      };
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      return {
+        approved: false,
+        decision: PUBLICATION_DECISION_PENDING,
+        status: PUBLICATION_STATUS_PENDING,
+        valid: false,
+        reason: `Falha ao ler manifest.json: ${e.message}`,
+        projectSlug: cleanSlug,
+        version: null,
+        notes: null
+      };
+    }
+  }
+
+  const validation = validatePublicationApproval(manifest);
+  return { ...validation, projectSlug: cleanSlug };
+}
+
+/**
+ * Registra a deliberação formal soberana de Paulo Nunes para autorização de publicação.
+ *
+ * PRÉ-REQUISITOS DETERMINÍSTICOS PARA APROVAÇÃO:
+ * 1. buildApproval.approved === true e decision === 'APPROVED'
+ * 2. buildExecution.status === 'CONCLUIDA'
+ * 3. buildExecution.version === <version>
+ * 4. buildValidation.status === 'VALIDADA' e isValid === true
+ * 5. buildValidation.version === <version> (quando existir)
+ * 6. siteHomologation.status === 'HOMOLOGADA' e approved === true
+ * 7. siteHomologation.version === <version>
+ * 8. buildExecution.version === siteHomologation.version
+ * 9. siteHomologation.decisionAt >= buildExecution.executedAt (proteção temporal)
+ * 10. manifest.projectSlug === projectSlug solicitado
+ * 11. versão solicitada passa pela validação de versão existente
+ */
+function setPublicationApproval(projectSlug, approved, options = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+
+  if (typeof approved !== 'boolean') {
+    throw new Error(`Parâmetro de autorização de publicação inválido: '${approved}'. A deliberação deve ser estritamente booleana (true para aprovar, false para rejeitar).`);
+  }
+
+  let targetVersion = null;
+  let opt = {};
+  if (typeof options === 'string') {
+    targetVersion = validateVersion(options);
+  } else if (typeof options === 'object' && options !== null) {
+    opt = options;
+    if (opt.version) {
+      targetVersion = validateVersion(opt.version);
+    }
+  }
+
+  if (!targetVersion) {
+    const err = new Error(`[VERSÃO OBRIGATÓRIA] A autorização de publicação deve estar vinculada a uma versão específica.`);
+    err.code = 'VERSION_REQUIRED';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = opt.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = opt.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(`Projeto inexistente ou manifest.json não encontrado para '${cleanSlug}' em: ${manifestPath}`);
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      throw new Error(`Falha ao ler manifest.json para '${cleanSlug}': ${e.message}`);
+    }
+  }
+
+  // Validação de isolamento por projectSlug
+  if (manifest.projectSlug && manifest.projectSlug !== cleanSlug) {
+    const err = new Error(`[PROJECT_SLUG INCOMPATÍVEL] projectSlug no manifest ('${manifest.projectSlug}') difere do solicitado ('${cleanSlug}').`);
+    err.code = 'PUBLICATION_PROJECT_SLUG_MISMATCH';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  const decisionTimestamp = new Date().toISOString();
+
+  if (approved) {
+    // PRÉ-REQUISITO 1: BUILD APPROVAL
+    const buildApp = getBuildApproval(cleanSlug, { ...opt, manifestOverride: manifest });
+    if (!buildApp.approved || buildApp.decision !== BUILD_DECISION_APPROVED) {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Impossível autorizar publicação para '${cleanSlug}': A construção não possui aprovação formal prévia.`);
+      err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+
+    // PRÉ-REQUISITO 2: BUILD EXECUTION
+    if (!manifest.buildExecution || manifest.buildExecution.status !== 'CONCLUIDA') {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Impossível autorizar publicação para '${cleanSlug}': O site ainda não foi construído (buildExecution ausente ou incompleto).`);
+      err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    if (manifest.buildExecution.version !== targetVersion) {
+      const err = new Error(`[VERSÃO INCOMPATÍVEL] Versão construída ('${manifest.buildExecution.version}') difere da versão solicitada ('${targetVersion}') para '${cleanSlug}'.`);
+      err.code = 'PUBLICATION_VERSION_MISMATCH';
+      err.projectSlug = cleanSlug;
+      err.requestedVersion = targetVersion;
+      err.builtVersion = manifest.buildExecution.version;
+      throw err;
+    }
+
+    // PRÉ-REQUISITO 3: BUILD VALIDATION
+    if (!manifest.buildValidation || manifest.buildValidation.status !== 'VALIDADA' || !manifest.buildValidation.isValid) {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Impossível autorizar publicação para '${cleanSlug}': Os arquivos de produção não foram validados tecnicamente.`);
+      err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    if (manifest.buildValidation.version && manifest.buildValidation.version !== targetVersion) {
+      const err = new Error(`[VERSÃO INCOMPATÍVEL] Versão da validação ('${manifest.buildValidation.version}') difere da versão solicitada ('${targetVersion}') para '${cleanSlug}'.`);
+      err.code = 'PUBLICATION_VERSION_MISMATCH';
+      err.projectSlug = cleanSlug;
+      err.requestedVersion = targetVersion;
+      throw err;
+    }
+
+    // PRÉ-REQUISITO 4: SITE HOMOLOGATION
+    const homo = getHomologation(cleanSlug, { ...opt, manifestOverride: manifest });
+    if (!homo.approved || homo.decision !== HOMOLOGATION_DECISION_APPROVED || homo.status !== 'HOMOLOGADA') {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Impossível autorizar publicação para '${cleanSlug}': O site não foi formalmente homologado.`);
+      err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    if (homo.version !== targetVersion) {
+      const err = new Error(`[VERSÃO INCOMPATÍVEL] Versão homologada ('${homo.version}') difere da versão solicitada ('${targetVersion}') para '${cleanSlug}'.`);
+      err.code = 'PUBLICATION_VERSION_MISMATCH';
+      err.projectSlug = cleanSlug;
+      err.requestedVersion = targetVersion;
+      err.homologatedVersion = homo.version;
+      throw err;
+    }
+    if (manifest.buildExecution.version !== homo.version) {
+      const err = new Error(`[VERSÃO INCOMPATÍVEL] Versão construída ('${manifest.buildExecution.version}') difere da versão homologada ('${homo.version}') para '${cleanSlug}'.`);
+      err.code = 'PUBLICATION_VERSION_MISMATCH';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+
+    // PRÉ-REQUISITO 5: PROTEÇÃO TEMPORAL
+    if (manifest.buildExecution.executedAt && homo.decisionAt) {
+      const executedTime = new Date(manifest.buildExecution.executedAt).getTime();
+      const homoTime = new Date(homo.decisionAt).getTime();
+      if (!isNaN(executedTime) && !isNaN(homoTime) && homoTime < executedTime) {
+        const err = new Error(`[HOMOLOGAÇÃO OBSOLETA] A homologação em '${homo.decisionAt}' é anterior à última execução de build em '${manifest.buildExecution.executedAt}' para '${cleanSlug}'.`);
+        err.code = 'HOMOLOGATION_STALE';
+        err.projectSlug = cleanSlug;
+        err.decisionAt = homo.decisionAt;
+        err.executedAt = manifest.buildExecution.executedAt;
+        throw err;
+      }
+    }
+
+    manifest.publicationApproval = {
+      approved: true,
+      decision: PUBLICATION_DECISION_APPROVED,
+      status: PUBLICATION_STATUS_APPROVED,
+      decisionBy: REQUIRED_APPROVER,
+      decisionAt: decisionTimestamp,
+      projectSlug: cleanSlug,
+      version: targetVersion,
+      notes: opt.notes || null
+    };
+  } else {
+    // Rejeição formal de publicação: não destrói os estados anteriores de build e homologação
+    manifest.publicationApproval = {
+      approved: false,
+      decision: PUBLICATION_DECISION_REJECTED,
+      status: PUBLICATION_STATUS_REJECTED,
+      decisionBy: REQUIRED_APPROVER,
+      decisionAt: decisionTimestamp,
+      projectSlug: cleanSlug,
+      version: targetVersion,
+      notes: opt.notes || null
+    };
+  }
+
+  if (!opt.manifestOverride && opt.save !== false) {
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  }
+
+  if (opt.updatePanel !== false && !opt.manifestOverride && fs.existsSync(projectDir)) {
+    generateApprovalPanel(cleanSlug, targetVersion, {
+      ...opt,
+      openInEditor: opt.openInEditor !== undefined ? opt.openInEditor : false
+    });
+  }
+
+  return {
+    success: true,
+    projectSlug: cleanSlug,
+    version: targetVersion,
+    decision: manifest.publicationApproval.decision,
+    status: manifest.publicationApproval.status,
+    decisionBy: manifest.publicationApproval.decisionBy,
+    decisionAt: manifest.publicationApproval.decisionAt,
+    notes: manifest.publicationApproval.notes
+  };
+}
+
+/**
+ * Gate determinístico de autorização de publicação.
+ * Bloqueia qualquer operação que dependa de publicação sem a prévia e soberana autorização de Paulo Nunes.
+ */
+function assertPublicationApproved(projectSlug, versionOrOptions = {}, maybeOptions = {}) {
+  const cleanSlug = validateProjectSlug(projectSlug);
+
+  let expectedVersion = null;
+  let options = {};
+
+  if (typeof versionOrOptions === 'string') {
+    expectedVersion = validateVersion(versionOrOptions);
+    options = maybeOptions || {};
+  } else if (typeof versionOrOptions === 'object' && versionOrOptions !== null) {
+    options = versionOrOptions;
+    if (options.version) {
+      expectedVersion = validateVersion(options.version);
+    }
+  }
+
+  const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+  const baseDir = options.baseDir || (fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos'));
+  const projectDir = path.join(baseDir, cleanSlug);
+  const manifestPath = path.join(projectDir, 'manifest.json');
+
+  let manifest = options.manifestOverride || null;
+  if (!manifest) {
+    if (!fs.existsSync(manifestPath)) {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Projeto inexistente ou manifest.json não encontrado para '${cleanSlug}'.`);
+      err.code = 'PUBLICATION_APPROVAL_REQUIRED';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+    try {
+      manifest = readJsonSafely(manifestPath);
+    } catch (e) {
+      const err = new Error(`[PUBLICAÇÃO BLOQUEADA] Falha ao ler manifest.json para '${cleanSlug}': ${e.message}`);
+      err.code = 'PUBLICATION_APPROVAL_REQUIRED';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+  }
+
+  // 1. Isolamento de projectSlug
+  if (manifest.projectSlug && manifest.projectSlug !== cleanSlug) {
+    const err = new Error(`[PROJECT_SLUG INCOMPATÍVEL] projectSlug no manifest ('${manifest.projectSlug}') difere de '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PROJECT_SLUG_MISMATCH';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // 2. Validação da estrutura de publicationApproval
+  const val = validatePublicationApproval(manifest);
+  if (!val.valid) {
+    const err = new Error(`[ESTADO INVÁLIDO] Estrutura de publicationApproval inválida para '${cleanSlug}': ${val.reason}`);
+    err.code = 'PUBLICATION_APPROVAL_INVALID';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (!val.approved || val.decision !== PUBLICATION_DECISION_APPROVED || val.status !== PUBLICATION_STATUS_APPROVED) {
+    const err = new Error(`[PUBLICAÇÃO BLOQUEADA] A publicação do site da oportunidade '${cleanSlug}' não possui autorização formal aprovada.`);
+    err.code = 'PUBLICATION_APPROVAL_REQUIRED';
+    err.projectSlug = cleanSlug;
+    err.status = val.status;
+    err.decision = val.decision;
+    throw err;
+  }
+
+  if (val.decisionBy !== REQUIRED_APPROVER) {
+    const err = new Error(`[APROVADOR INVÁLIDO] Autorização de publicação requer aprovador oficial '${REQUIRED_APPROVER}'.`);
+    err.code = 'PUBLICATION_APPROVAL_INVALID';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (!val.decisionAt || typeof val.decisionAt !== 'string') {
+    const err = new Error(`[TIMESTAMP INVÁLIDO] Timestamp 'decisionAt' ausente ou inválido.`);
+    err.code = 'PUBLICATION_APPROVAL_INVALID';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (val.projectSlug && val.projectSlug !== cleanSlug) {
+    const err = new Error(`[PROJECT_SLUG INCOMPATÍVEL] projectSlug em publicationApproval ('${val.projectSlug}') difere de '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PROJECT_SLUG_MISMATCH';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // 3. Verificação de pré-requisitos essenciais da cadeia
+  const buildApp = getBuildApproval(cleanSlug, { ...options, manifestOverride: manifest });
+  if (!buildApp.approved || buildApp.decision !== BUILD_DECISION_APPROVED) {
+    const err = new Error(`[PRÉ-REQUISITO AUSENTE] Build não possui aprovação formal para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (!manifest.buildExecution || manifest.buildExecution.status !== 'CONCLUIDA') {
+    const err = new Error(`[PRÉ-REQUISITO AUSENTE] Build de produção não concluído para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  if (!manifest.buildValidation || manifest.buildValidation.status !== 'VALIDADA' || !manifest.buildValidation.isValid) {
+    const err = new Error(`[PRÉ-REQUISITO AUSENTE] Build de produção não validado para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  const homo = getHomologation(cleanSlug, { ...options, manifestOverride: manifest });
+  if (!homo.approved || homo.decision !== HOMOLOGATION_DECISION_APPROVED || homo.status !== 'HOMOLOGADA') {
+    const err = new Error(`[PRÉ-REQUISITO AUSENTE] Site não homologado para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+    err.projectSlug = cleanSlug;
+    throw err;
+  }
+
+  // 4. Isolamento estrito por versão
+  if (expectedVersion && val.version !== expectedVersion) {
+    const err = new Error(`[VERSÃO NÃO AUTORIZADA] A versão solicitada ('${expectedVersion}') difere da versão autorizada para publicação ('${val.version}') para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_VERSION_MISMATCH';
+    err.projectSlug = cleanSlug;
+    err.requestedVersion = expectedVersion;
+    err.approvedVersion = val.version;
+    throw err;
+  }
+
+  if (val.version !== manifest.buildExecution.version) {
+    const err = new Error(`[VERSÃO NÃO AUTORIZADA] A versão autorizada para publicação ('${val.version}') difere da versão atualmente construída ('${manifest.buildExecution.version}') para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_VERSION_MISMATCH';
+    err.projectSlug = cleanSlug;
+    err.approvedVersion = val.version;
+    err.builtVersion = manifest.buildExecution.version;
+    throw err;
+  }
+
+  if (val.version !== homo.version) {
+    const err = new Error(`[VERSÃO NÃO AUTORIZADA] A versão autorizada para publicação ('${val.version}') difere da versão homologada ('${homo.version}') para '${cleanSlug}'.`);
+    err.code = 'PUBLICATION_VERSION_MISMATCH';
+    err.projectSlug = cleanSlug;
+    err.approvedVersion = val.version;
+    err.homologatedVersion = homo.version;
+    throw err;
+  }
+
+  // 5. Proteção temporal estrita
+  if (manifest.buildExecution.executedAt && homo.decisionAt) {
+    const executedTime = new Date(manifest.buildExecution.executedAt).getTime();
+    const homoTime = new Date(homo.decisionAt).getTime();
+    if (!isNaN(executedTime) && !isNaN(homoTime) && homoTime < executedTime) {
+      const err = new Error(`[HOMOLOGAÇÃO OBSOLETA] Homologação em '${homo.decisionAt}' é anterior à execução do build em '${manifest.buildExecution.executedAt}'.`);
+      err.code = 'PUBLICATION_PREREQUISITE_MISSING';
+      err.projectSlug = cleanSlug;
+      throw err;
+    }
+  }
+
+  if (homo.decisionAt && val.decisionAt) {
+    const homoTime = new Date(homo.decisionAt).getTime();
+    const pubTime = new Date(val.decisionAt).getTime();
+    if (!isNaN(homoTime) && !isNaN(pubTime) && pubTime < homoTime) {
+      const err = new Error(`[AUTORIZAÇÃO OBSOLETA] A autorização de publicação em '${val.decisionAt}' é anterior à homologação em '${homo.decisionAt}' para '${cleanSlug}'. Requer nova autorização de publicação.`);
+      err.code = 'PUBLICATION_APPROVAL_STALE';
+      err.projectSlug = cleanSlug;
+      err.decisionAt = val.decisionAt;
+      err.homologatedAt = homo.decisionAt;
+      throw err;
+    }
+  }
+
+  return {
+    allowed: true,
+    projectSlug: cleanSlug,
+    version: val.version,
+    status: val.status,
+    decision: val.decision,
+    decisionBy: val.decisionBy,
+    decisionAt: val.decisionAt
+  };
+}
+
+/**
  * Gera o Painel de Aprovação Comercial estruturado (PAINEL_APROVACAO.md).
  * CAMADA DE VISUALIZAÇÃO PASSIVA: NÃO EXECUTA DISPARO, NÃO ALTERA O MANIFEST.
  */
@@ -1530,6 +2207,22 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     validationStatusDisplay = '🟢 VALIDADA';
   } else if (buildValidation && buildValidation.status === 'INVALIDA') {
     validationStatusDisplay = '🔴 INVÁLIDA';
+  }
+
+  const pubApproval = getPublicationApproval(projectSlug, { ...options, manifestOverride: manifest });
+  let publicationStatusDisplay = '⏳ PENDENTE DE APROVAÇÃO';
+  if (pubApproval.decision === PUBLICATION_DECISION_APPROVED && pubApproval.approved) {
+    publicationStatusDisplay = '🟢 APROVADA';
+  } else if (pubApproval.decision === PUBLICATION_DECISION_REJECTED) {
+    publicationStatusDisplay = '🔴 REJEITADA';
+  }
+
+  let publicationGateSituation = '🔴 PUBLICAÇÃO BLOQUEADA';
+  try {
+    assertPublicationApproved(projectSlug, targetVersion, { ...options, manifestOverride: manifest });
+    publicationGateSituation = '🟢 PUBLICAÇÃO AUTORIZADA';
+  } catch (e) {
+    publicationGateSituation = '🔴 PUBLICAÇÃO BLOQUEADA';
   }
 
   const content = [
@@ -1698,6 +2391,31 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     ]),
     ``,
     `---`,
+    ``,
+    `## 🚀 APROVAÇÃO DA PUBLICAÇÃO DO SITE`,
+    ``,
+    `- **Status Atual:** ${publicationStatusDisplay}`,
+    `- **Decisão Registrada:** \`${pubApproval.decision}\``,
+    `- **Projeto:** \`${projectSlug}\``,
+    `- **Versão:** \`${pubApproval.version || targetVersion}\``,
+    `- **Aprovador:** ${pubApproval.decisionBy || 'Pendente'}`,
+    `- **Data/Hora:** ${pubApproval.decisionAt || 'Pendente'}`,
+    `- **Estado de Governança:** Somente uma autorização soberana e formal de Paulo Nunes autoriza a publicação do site. Homologação, validação ou término de build NÃO equivalem a autorização de publicação.`,
+    `- **Cadeia de Governança:**`,
+    `  - Build Approval: \`${buildApproval.decision}\``,
+    `  - Build Execution: \`${manifest.buildExecution ? manifest.buildExecution.status : 'NÃO INICIADA'}\``,
+    `  - Build Validation: \`${buildValidation ? buildValidation.status : 'PENDENTE'}\``,
+    `  - Site Homologation: \`${homologation.decision}\``,
+    `  - Publication Approval: \`${pubApproval.decision}\``,
+    `- **Situação do Gate:** ${publicationGateSituation}`,
+    ``,
+    `> [!NOTE]`,
+    `> **COMANDOS DE AUTORIZAÇÃO DE PUBLICAÇÃO:**`,
+    `> - Para autorizar a publicação: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-publication\``,
+    `> - Para rejeitar a publicação: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-publication\``,
+    `> - Para consultar status: \`node dispatcher.js ${projectSlug} ${targetVersion} --publication-status\``,
+    ``,
+    `---`,
     `### COMANDO PARA AUTORIZAR DISPARO REAL (SOMENTE APÓS DELIBERAÇÃO HUMANA)`,
     `> [!CAUTION]`,
     `> **ATENÇÃO:** O envio real é irreversível e exige autorização soberana prévia de Paulo Nunes.`,
@@ -1730,6 +2448,7 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     subject,
     previewUrl,
     buildApproval,
+    publicationApproval: pubApproval,
     productionSite: {
       exists: siteInfo.exists,
       path: siteInfo.indexPath
@@ -2076,6 +2795,95 @@ if (require.main === module) {
     process.exit(0);
   }
 
+  // Autorização formal de publicação do site de produção (Fase 4)
+  if (args.includes('--approve-publication')) {
+    try {
+      const res = setPublicationApproval(slug, true, { version });
+      console.log(`\n====================================================`);
+      console.log(` AUTORIZAÇÃO DE PUBLICAÇÃO REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:     ${slug}`);
+      console.log(`Versão:      ${version}`);
+      console.log(`Decisão:     🟢 ${res.decision} (${res.status})`);
+      console.log(`Aprovador:   ${res.decisionBy}`);
+      console.log(`Data/Hora:   ${res.decisionAt}`);
+      console.log(`Notas:       ${res.notes || 'Nenhuma'}`);
+      console.log(`Painel:      Atualizado em PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NA AUTORIZAÇÃO DE PUBLICAÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Rejeição formal de publicação do site (Fase 4)
+  if (args.includes('--reject-publication')) {
+    try {
+      const res = setPublicationApproval(slug, false, { version });
+      console.log(`\n====================================================`);
+      console.log(` REJEIÇÃO DE PUBLICAÇÃO REGISTRADA COM SUCESSO`);
+      console.log(`====================================================`);
+      console.log(`Projeto:     ${slug}`);
+      console.log(`Versão:      ${version}`);
+      console.log(`Decisão:     🔴 ${res.decision} (${res.status})`);
+      console.log(`Aprovador:   ${res.decisionBy}`);
+      console.log(`Data/Hora:   ${res.decisionAt}`);
+      console.log(`Notas:       ${res.notes || 'Nenhuma'}`);
+      console.log(`Painel:      Atualizado em PAINEL_APROVACAO.md\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NA REJEIÇÃO DE PUBLICAÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Consulta do status de autorização de publicação da oportunidade (Fase 4 - Somente Leitura)
+  if (args.includes('--publication-status')) {
+    const pub = getPublicationApproval(slug);
+    const bApp = getBuildApproval(slug);
+    const bVal = getBuildValidation(slug);
+    const sHomo = getHomologation(slug);
+
+    const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+    const baseDir = fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos');
+    const manifestPath = path.join(baseDir, slug, 'manifest.json');
+    let buildExecStatus = 'N/A';
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const m = readJsonSafely(manifestPath);
+        buildExecStatus = m.buildExecution?.status || 'N/A';
+      } catch (e) {
+        buildExecStatus = 'ERRO_LEITURA';
+      }
+    }
+
+    let gateSituation = '🔴 PUBLICAÇÃO BLOQUEADA';
+    try {
+      assertPublicationApproved(slug, version);
+      gateSituation = '🟢 PUBLICAÇÃO AUTORIZADA';
+    } catch (err) {
+      gateSituation = '🔴 PUBLICAÇÃO BLOQUEADA';
+    }
+
+    console.log(`\n====================================================`);
+    console.log(` STATUS DE AUTORIZAÇÃO DE PUBLICAÇÃO DO SITE`);
+    console.log(`====================================================`);
+    console.log(`Projeto:              ${slug}`);
+    console.log(`Versão:               ${version}`);
+    console.log(`Status:               ${pub.status}`);
+    console.log(`Decisão:              ${pub.decision}`);
+    console.log(`Aprovador:            ${pub.decisionBy || 'Pendente'}`);
+    console.log(`Data/Hora:            ${pub.decisionAt || 'Pendente'}`);
+    console.log(`Estado de Governança:`);
+    console.log(`  - Build Approval:       ${bApp.decision}`);
+    console.log(`  - Build Execution:      ${buildExecStatus}`);
+    console.log(`  - Build Validation:     ${bVal?.status || 'Pendente'}`);
+    console.log(`  - Site Homologation:    ${sHomo.decision}`);
+    console.log(`  - Publication Approval: ${pub.decision}`);
+    console.log(`Situação do Gate:     ${gateSituation}\n`);
+    process.exit(0);
+  }
+
   executeDispatcher(slug, version, {
     productionSend: isProduction,
     dryRun: !isProduction
@@ -2106,6 +2914,14 @@ module.exports = {
   HOMOLOGATION_DECISION_APPROVED,
   HOMOLOGATION_DECISION_REJECTED,
   VALID_HOMOLOGATION_DECISIONS,
+  PUBLICATION_DECISION_PENDING,
+  PUBLICATION_DECISION_APPROVED,
+  PUBLICATION_DECISION_REJECTED,
+  VALID_PUBLICATION_DECISIONS,
+  PUBLICATION_STATUS_PENDING,
+  PUBLICATION_STATUS_APPROVED,
+  PUBLICATION_STATUS_REJECTED,
+  VALID_PUBLICATION_STATUSES,
   normalizeBuildDecision,
   parseMinuta,
   findMinutaFile,
@@ -2128,6 +2944,10 @@ module.exports = {
   getHomologation,
   setHomologation,
   assertSiteHomologated,
+  validatePublicationApproval,
+  getPublicationApproval,
+  setPublicationApproval,
+  assertPublicationApproved,
   executeBuildSite,
   executeApprovedBuild: executeBuildSite,
   buildSite: executeBuildSite
