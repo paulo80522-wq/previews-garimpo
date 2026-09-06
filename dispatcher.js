@@ -3089,5 +3089,9 @@ module.exports = {
   ERR_CREDENTIAL_SCOPE_EXCESSIVE: productionPublisher.ERR_CREDENTIAL_SCOPE_EXCESSIVE,
   FORBIDDEN_ADMIN_SCOPES: productionPublisher.FORBIDDEN_ADMIN_SCOPES,
   redactSecrets: productionPublisher.redactSecrets,
-  assertCredentialScope: productionPublisher.assertCredentialScope
+  assertCredentialScope: productionPublisher.assertCredentialScope,
+  ERR_CREDENTIAL_NOT_FOUND: productionPublisher.ERR_CREDENTIAL_NOT_FOUND,
+  ERR_INVALID_CREDENTIAL_STORAGE: productionPublisher.ERR_INVALID_CREDENTIAL_STORAGE,
+  DEFAULT_PUBLISHING_VAULT_DIR: productionPublisher.DEFAULT_PUBLISHING_VAULT_DIR,
+  loadPublicationCredential: productionPublisher.loadPublicationCredential
 };

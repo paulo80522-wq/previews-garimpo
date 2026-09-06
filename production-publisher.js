@@ -49,6 +49,13 @@ const ERR_CREDENTIAL_ENVIRONMENT_MISMATCH = 'CREDENTIAL_ENVIRONMENT_MISMATCH';
 const ERR_CREDENTIAL_SCOPE_MISMATCH = 'CREDENTIAL_SCOPE_MISMATCH';
 const ERR_CREDENTIAL_SCOPE_EXCESSIVE = 'CREDENTIAL_SCOPE_EXCESSIVE';
 
+// Constantes da Fase 8.2 (Vault Loader Seguro)
+const ERR_CREDENTIAL_NOT_FOUND = 'CREDENTIAL_NOT_FOUND';
+const ERR_INVALID_CREDENTIAL_STORAGE = 'INVALID_CREDENTIAL_STORAGE';
+
+const USER_HOME = process.env.USERPROFILE || process.env.HOME || 'C:\\Users\\35tul';
+const DEFAULT_PUBLISHING_VAULT_DIR = path.resolve(USER_HOME, '.gemini', 'config', 'credentials', 'publishing');
+
 const FORBIDDEN_ADMIN_SCOPES = [
   'admin:org', 'admin:public_key', 'admin:repo_hook', 'admin:org_hook',
   'admin:enterprise', 'admin:gpg_key', 'delete_repo', 'repo:delete',
@@ -484,6 +491,267 @@ function assertCredentialScope(credential, publicationContext) {
   };
 }
 
+/**
+ * Provedor de Carregamento Seguro e Isolamento do Armazenamento de Credenciais (Fase 8.2).
+ *
+ * Carrega defensivamente uma credencial sintética/estruturada a partir do cofre (vault)
+ * autorizado fora do repositório, garantindo:
+ * 1. credentialId estritamente validado (sem path traversal, sem separadores).
+ * 2. Vault autorizado fora de qualquer workspace ou repositório versionado.
+ * 3. Proibição absoluta de leitura dentro de previews-garimpo, .git ou arquivos .env.
+ * 4. Resolução de caminho físico real (anti-symlink e anti-junction escape).
+ * 5. Rejeição determinística (ERR_CREDENTIAL_NOT_FOUND se ausente, ERR_INVALID_CREDENTIAL_STORAGE se anômalo/inseguro).
+ * 6. Integração defensiva com assertCredentialScope() da Fase 8.1.
+ *
+ * @param {string} credentialId Identificador lógico da credencial
+ * @param {Object} options Opções de carregamento (vaultDir, publicationContext, etc.)
+ * @returns {Object} Credencial carregada e validada
+ */
+function loadPublicationCredential(credentialId, options = {}) {
+  // 1. Validação estrita do credentialId
+  if (!credentialId || typeof credentialId !== 'string') {
+    const err = new Error(`[VAULT LOADER] Identificador de credencial ausente ou inválido: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  const rawId = credentialId.trim();
+  if (rawId.length === 0) {
+    const err = new Error(`[VAULT LOADER] Identificador de credencial vazio: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  // Prevenção direta contra path traversal e caracteres perigosos
+  if (
+    rawId.includes('..') ||
+    rawId.includes('/') ||
+    rawId.includes('\\') ||
+    rawId.includes(':') ||
+    rawId.includes('~') ||
+    rawId.includes('%') ||
+    rawId.includes('$') ||
+    rawId.startsWith('.') ||
+    path.isAbsolute(rawId)
+  ) {
+    const err = new Error(`[VAULT LOADER] Identificador de credencial contém path traversal ou caracteres inválidos ('${rawId}'): ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.credentialId = rawId;
+    throw err;
+  }
+
+  // Validação de formato seguro (letras, números, hifens, underscores, com extensão opcional .json)
+  const safeIdRegex = /^[a-zA-Z0-9_-]+(?:\.json)?$/;
+  if (!safeIdRegex.test(rawId)) {
+    const err = new Error(`[VAULT LOADER] Formato de identificador de credencial não autorizado ('${rawId}'): ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.credentialId = rawId;
+    throw err;
+  }
+
+  // Rejeição direta de arquivos sensíveis ou de ambiente
+  if (rawId.toLowerCase() === '.env' || rawId.toLowerCase().startsWith('.env')) {
+    const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO DO VAULT] Tentativa de acessar arquivo .env como credencial: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  // 2. Resolução do diretório do Vault
+  const vaultDir = options.vaultDir || options._testVaultDir || DEFAULT_PUBLISHING_VAULT_DIR;
+  if (typeof vaultDir !== 'string' || vaultDir.trim().length === 0) {
+    const err = new Error(`[VAULT LOADER] Diretório do vault inválido: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  const normalizedVault = path.resolve(vaultDir);
+  const lowerVault = normalizedVault.toLowerCase();
+
+  // 3. Verificações de Isolamento do Vault (NUNCA dentro de repositórios versionados)
+  if (lowerVault.includes(FORBIDDEN_PATH_SUBSTRING)) {
+    const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO DO VAULT] O cofre de credenciais não pode residir dentro de previews-garimpo: ${normalizedVault}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.vaultDir = normalizedVault;
+    throw err;
+  }
+
+  if (lowerVault.includes(path.sep + '.git') || lowerVault.endsWith('.git') || lowerVault.includes('/.git')) {
+    const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO DO VAULT] O cofre de credenciais não pode residir dentro de .git: ${normalizedVault}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.vaultDir = normalizedVault;
+    throw err;
+  }
+
+  if (lowerVault.includes('castlink-real')) {
+    const err = new Error(`[VIOLAÇÃO DE AMBIENTE PROTEGIDO] O cofre de credenciais não pode apontar para CASTLINK_REAL: ${normalizedVault}`);
+    err.code = ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE;
+    err.vaultDir = normalizedVault;
+    throw err;
+  }
+
+  if (lowerVault.endsWith('.env') || lowerVault.includes(path.sep + '.env')) {
+    const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO DO VAULT] O cofre de credenciais não pode residir em .env: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  // 4. Verificação de existência do diretório do Vault
+  if (!fs.existsSync(normalizedVault)) {
+    const err = new Error(`[VAULT LOADER] Diretório do vault inexistente ou inacessível ('${normalizedVault}'): ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.vaultDir = normalizedVault;
+    throw err;
+  }
+
+  // 5. Verificação física do diretório do Vault (fs.realpathSync)
+  let physicalVault;
+  try {
+    physicalVault = fs.realpathSync(normalizedVault);
+  } catch (e) {
+    const err = new Error(`[VAULT LOADER] Falha na resolução física do diretório do vault: ${e.message}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  const lowerPhysicalVault = physicalVault.toLowerCase();
+  if (lowerPhysicalVault.includes(FORBIDDEN_PATH_SUBSTRING)) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Diretório físico do vault aponta para previews-garimpo: ${physicalVault}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.physicalVault = physicalVault;
+    throw err;
+  }
+
+  if (lowerPhysicalVault.includes('castlink-real')) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Diretório físico do vault aponta para CASTLINK_REAL: ${physicalVault}`);
+    err.code = ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE;
+    err.physicalVault = physicalVault;
+    throw err;
+  }
+
+  if (lowerPhysicalVault.includes(path.sep + '.git') || lowerPhysicalVault.endsWith('.git')) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Diretório físico do vault aponta para .git: ${physicalVault}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.physicalVault = physicalVault;
+    throw err;
+  }
+
+  // 6. Construção e validação do caminho do arquivo de credencial
+  const fileName = rawId.endsWith('.json') ? rawId : `${rawId}.json`;
+  const targetFilePath = path.resolve(normalizedVault, fileName);
+
+  // Garantir que o caminho do arquivo reside estritamente dentro do vault normalizado
+  if (!targetFilePath.startsWith(normalizedVault + path.sep)) {
+    const err = new Error(`[VAULT LOADER] Path traversal detectado no arquivo de credencial: ${targetFilePath}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  // 7. Verificação de existência do arquivo de credencial
+  if (!fs.existsSync(targetFilePath)) {
+    const err = new Error(`[VAULT LOADER] Credencial '${rawId}' não encontrada no vault autorizado: ${ERR_CREDENTIAL_NOT_FOUND}`);
+    err.code = ERR_CREDENTIAL_NOT_FOUND;
+    err.credentialId = rawId;
+    throw err;
+  }
+
+  // 8. Resolução física do arquivo de credencial (anti-symlink escape)
+  let physicalFile;
+  try {
+    physicalFile = fs.realpathSync(targetFilePath);
+  } catch (e) {
+    const err = new Error(`[VAULT LOADER] Falha na resolução física do arquivo de credencial: ${e.message}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  const lowerPhysicalFile = physicalFile.toLowerCase();
+  // Verificar se o arquivo físico reside dentro do diretório físico do vault
+  if (!lowerPhysicalFile.startsWith(lowerPhysicalVault + path.sep)) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Arquivo de credencial aponta para fora do vault autorizado: ${physicalFile}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.physicalFile = physicalFile;
+    throw err;
+  }
+
+  if (lowerPhysicalFile.includes(FORBIDDEN_PATH_SUBSTRING)) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Arquivo de credencial aponta para previews-garimpo: ${physicalFile}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    err.physicalFile = physicalFile;
+    throw err;
+  }
+
+  if (lowerPhysicalFile.includes('castlink-real')) {
+    const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Arquivo de credencial aponta para CASTLINK_REAL: ${physicalFile}`);
+    err.code = ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE;
+    err.physicalFile = physicalFile;
+    throw err;
+  }
+
+  // 9. Leitura e parsing seguro do arquivo
+  let rawContent;
+  try {
+    rawContent = fs.readFileSync(physicalFile, 'utf8');
+  } catch (e) {
+    const err = new Error(`[VAULT LOADER] Erro ao ler arquivo de credencial: ${e.message}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  let credential;
+  try {
+    credential = JSON.parse(rawContent);
+  } catch (e) {
+    const err = new Error(`[VAULT LOADER] Arquivo de credencial corrompido ou JSON inválido: ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  if (!credential || typeof credential !== 'object' || Array.isArray(credential)) {
+    const err = new Error(`[VAULT LOADER] Envelope de credencial em formato inválido (não-objeto): ${ERR_INVALID_CREDENTIAL_ENVELOPE}`);
+    err.code = ERR_INVALID_CREDENTIAL_ENVELOPE;
+    throw err;
+  }
+
+  // 10. Validação do envelope básico
+  const hasEnvelopeFields =
+    typeof credential.credentialId === 'string' && credential.credentialId.trim().length > 0 &&
+    typeof credential.provider === 'string' && credential.provider.trim().length > 0 &&
+    typeof credential.environment === 'string' && credential.environment.trim().length > 0 &&
+    typeof credential.projectSlug === 'string' && credential.projectSlug.trim().length > 0 &&
+    typeof credential.targetRepository === 'string' && credential.targetRepository.trim().length > 0 &&
+    Array.isArray(credential.allowedOperations) && credential.allowedOperations.length > 0 &&
+    Boolean(credential.expiresAt);
+
+  if (!hasEnvelopeFields) {
+    const err = new Error(`[VAULT LOADER] Envelope de credencial incompleto ou campos obrigatórios ausentes: ${ERR_INVALID_CREDENTIAL_ENVELOPE}`);
+    err.code = ERR_INVALID_CREDENTIAL_ENVELOPE;
+    throw err;
+  }
+
+  // Validação de consistência do credentialId interno com o requisitado
+  const cleanReqId = rawId.replace(/\.json$/i, '').toLowerCase();
+  const cleanEnvId = String(credential.credentialId).trim().replace(/\.json$/i, '').toLowerCase();
+  if (cleanReqId !== cleanEnvId) {
+    const err = new Error(`[VAULT LOADER] Identificador requisitado ('${rawId}') diverge do identificador declarado no envelope ('${credential.credentialId}'): ${ERR_INVALID_CREDENTIAL_STORAGE}`);
+    err.code = ERR_INVALID_CREDENTIAL_STORAGE;
+    throw err;
+  }
+
+  // Proteção soberana CASTLINK_REAL
+  if (credential.environment === ENVIRONMENT_TYPES.CASTLINK_REAL || credential.projectSlug === 'castlink-real') {
+    const err = new Error(`[VIOLAÇÃO DE AMBIENTE PROTEGIDO] Credencial vinculada a CASTLINK_REAL é terminantemente proibida: ${ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE}`);
+    err.code = ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE;
+    throw err;
+  }
+
+  // 11. Integração com assertCredentialScope se publicationContext for fornecido
+  const pubCtx = options.publicationContext || options.context || null;
+  if (pubCtx) {
+    assertCredentialScope(credential, pubCtx);
+  }
+
+  return credential;
+}
 
 /**
  * Valida o formato estrito do projectSlug.
@@ -1273,8 +1541,13 @@ function assertPublicationSafetyGate(projectSlug, version, targetConfig = {}, op
     }
   }
 
-  // 7. VALIDAÇÃO DEFENSIVA DE ESCOPO DE CREDENCIAIS (FASE 8.1)
-  const credCandidate = options.credential || target.credential || null;
+  // 7. VALIDAÇÃO DEFENSIVA DE ESCOPO DE CREDENCIAIS (FASE 8.1 & 8.2)
+  let credCandidate = options.credential || target.credential || null;
+  const credIdCandidate = options.credentialId || target.credentialId || null;
+  if (!credCandidate && credIdCandidate) {
+    credCandidate = loadPublicationCredential(credIdCandidate, options);
+  }
+
   if (options.requireCredential === true && !credCandidate) {
     const err = new Error(`[SAFETY GATE] Credencial de publicação exigida mas ausente: ${ERR_MISSING_PUBLICATION_CREDENTIAL}`);
     err.code = ERR_MISSING_PUBLICATION_CREDENTIAL;
@@ -1628,6 +1901,10 @@ module.exports = {
   FORBIDDEN_ADMIN_SCOPES,
   redactSecrets,
   assertCredentialScope,
+  ERR_CREDENTIAL_NOT_FOUND,
+  ERR_INVALID_CREDENTIAL_STORAGE,
+  DEFAULT_PUBLISHING_VAULT_DIR,
+  loadPublicationCredential,
   REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED,
   REAL_CASTLINK_DOMAIN_STATUS,
   getRealCastLinkDomainStatus,

@@ -101,7 +101,11 @@ const {
   FORBIDDEN_ADMIN_SCOPES,
   redactSecrets,
   assertCredentialScope,
-  assertCanonicalProductionSource
+  assertCanonicalProductionSource,
+  ERR_CREDENTIAL_NOT_FOUND,
+  ERR_INVALID_CREDENTIAL_STORAGE,
+  DEFAULT_PUBLISHING_VAULT_DIR,
+  loadPublicationCredential
 } = require('./dispatcher');
 
 const productionPublisher = require('./production-publisher');
@@ -7076,6 +7080,588 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       actual: `customDomain: ${errCustomDomain} | gate: ${errGate}`,
       passed
     });
+  }
+
+  // ==========================================================================
+  // FASE 8.2: TESTES OBRIGATÓRIOS DO VAULT LOADER SEGURO (209 a 226)
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 209: vault_loader_valid_credential
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-209-'));
+    try {
+      const credPayload = {
+        credentialId: 'cred-209',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-209',
+        targetRepository: 'cliente-209/site-oficial',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      };
+      fs.writeFileSync(path.join(tempDir, 'cred-209.json'), JSON.stringify(credPayload, null, 2), 'utf8');
+
+      const loaded = loadPublicationCredential('cred-209', { vaultDir: tempDir });
+      const passed = (loaded && loaded.credentialId === 'cred-209' && loaded.targetRepository === 'cliente-209/site-oficial');
+      results.push({
+        testNumber: 209,
+        name: 'vault_loader_valid_credential (credentialId válido carregado de vault autorizado)',
+        expected: 'Credencial carregada com sucesso e campos íntegros',
+        actual: `id: ${loaded?.credentialId} | repo: ${loaded?.targetRepository}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 210: vault_loader_nonexistent_credential
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-210-'));
+    try {
+      let errCode = null;
+      try {
+        loadPublicationCredential('cred-inexistente-210', { vaultDir: tempDir });
+      } catch (e) {
+        errCode = e.code;
+      }
+      const passed = (errCode === 'CREDENTIAL_NOT_FOUND');
+      results.push({
+        testNumber: 210,
+        name: 'vault_loader_nonexistent_credential (credentialId inexistente rejeitado com CREDENTIAL_NOT_FOUND)',
+        expected: 'CREDENTIAL_NOT_FOUND',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 211: vault_loader_nonexistent_vault
+  // --------------------------------------------------------------------------
+  {
+    const nonExistentVault = path.join(os.tmpdir(), `non-existent-vault-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`);
+    let errCode = null;
+    try {
+      loadPublicationCredential('cred-211', { vaultDir: nonExistentVault });
+    } catch (e) {
+      errCode = e.code;
+    }
+    const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+    results.push({
+      testNumber: 211,
+      name: 'vault_loader_nonexistent_vault (vault inexistente rejeitado com INVALID_CREDENTIAL_STORAGE)',
+      expected: 'INVALID_CREDENTIAL_STORAGE',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 212: vault_loader_corrupted_json
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-212-'));
+    try {
+      fs.writeFileSync(path.join(tempDir, 'cred-corrupt.json'), '{"broken json: true, missing brace', 'utf8');
+      let errCode = null;
+      try {
+        loadPublicationCredential('cred-corrupt', { vaultDir: tempDir });
+      } catch (e) {
+        errCode = e.code;
+      }
+      const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 212,
+        name: 'vault_loader_corrupted_json (arquivo com JSON corrompido rejeitado com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 213: vault_loader_incomplete_envelope
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-213-'));
+    try {
+      fs.writeFileSync(path.join(tempDir, 'cred-incomplete.json'), JSON.stringify({ credentialId: 'cred-incomplete' }), 'utf8');
+      let errCode = null;
+      try {
+        loadPublicationCredential('cred-incomplete', { vaultDir: tempDir });
+      } catch (e) {
+        errCode = e.code;
+      }
+      const passed = (errCode === 'INVALID_CREDENTIAL_ENVELOPE');
+      results.push({
+        testNumber: 213,
+        name: 'vault_loader_incomplete_envelope (envelope com campos obrigatórios ausentes rejeitado com INVALID_CREDENTIAL_ENVELOPE)',
+        expected: 'INVALID_CREDENTIAL_ENVELOPE',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 214: vault_loader_traversal_forward_slash
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-214-'));
+    try {
+      let errCode = null;
+      try {
+        loadPublicationCredential('../escaped-cred', { vaultDir: tempDir });
+      } catch (e) {
+        errCode = e.code;
+      }
+      const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 214,
+        name: 'vault_loader_traversal_forward_slash (credentialId com ../ rejeitado com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 215: vault_loader_traversal_backslash
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-215-'));
+    try {
+      let errCode = null;
+      try {
+        loadPublicationCredential('..\\escaped-cred', { vaultDir: tempDir });
+      } catch (e) {
+        errCode = e.code;
+      }
+      const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 215,
+        name: 'vault_loader_traversal_backslash (credentialId com ..\\ rejeitado com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 216: vault_loader_absolute_path_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-216-'));
+    try {
+      let errWin = null;
+      try {
+        loadPublicationCredential('C:\\windows\\system32\\secret', { vaultDir: tempDir });
+      } catch (e) {
+        errWin = e.code;
+      }
+
+      let errUnix = null;
+      try {
+        loadPublicationCredential('/etc/shadow', { vaultDir: tempDir });
+      } catch (e) {
+        errUnix = e.code;
+      }
+
+      const passed = (errWin === 'INVALID_CREDENTIAL_STORAGE') && (errUnix === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 216,
+        name: 'vault_loader_absolute_path_rejected (caminho absoluto rejeitado com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE para caminhos absolutos Windows e Unix',
+        actual: `win: ${errWin} | unix: ${errUnix}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 217: vault_loader_previews_garimpo_vault_rejected
+  // --------------------------------------------------------------------------
+  {
+    let errDirect = null;
+    try {
+      loadPublicationCredential('cred-217', { vaultDir: path.resolve(__dirname) });
+    } catch (e) {
+      errDirect = e.code;
+    }
+
+    let errSubdir = null;
+    try {
+      loadPublicationCredential('cred-217', { vaultDir: path.join(__dirname, 'castlink-world') });
+    } catch (e) {
+      errSubdir = e.code;
+    }
+
+    const passed = (errDirect === 'INVALID_CREDENTIAL_STORAGE') && (errSubdir === 'INVALID_CREDENTIAL_STORAGE');
+    results.push({
+      testNumber: 217,
+      name: 'vault_loader_previews_garimpo_vault_rejected (vault dentro de previews-garimpo rejeitado)',
+      expected: 'INVALID_CREDENTIAL_STORAGE para diretório do repositório ou subpastas',
+      actual: `direct: ${errDirect} | subdir: ${errSubdir}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 218: vault_loader_git_dir_vault_rejected
+  // --------------------------------------------------------------------------
+  {
+    let errCode = null;
+    try {
+      loadPublicationCredential('cred-218', { vaultDir: path.join(os.tmpdir(), '.git') });
+    } catch (e) {
+      errCode = e.code;
+    }
+    const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+    results.push({
+      testNumber: 218,
+      name: 'vault_loader_git_dir_vault_rejected (vault em diretório .git rejeitado com INVALID_CREDENTIAL_STORAGE)',
+      expected: 'INVALID_CREDENTIAL_STORAGE',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 219: vault_loader_env_file_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-219-'));
+    try {
+      let errEnv = null;
+      try {
+        loadPublicationCredential('.env', { vaultDir: tempDir });
+      } catch (e) {
+        errEnv = e.code;
+      }
+
+      let errEnvLocal = null;
+      try {
+        loadPublicationCredential('.env.local', { vaultDir: tempDir });
+      } catch (e) {
+        errEnvLocal = e.code;
+      }
+
+      const passed = (errEnv === 'INVALID_CREDENTIAL_STORAGE') && (errEnvLocal === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 219,
+        name: 'vault_loader_env_file_rejected (tentativa de carregar arquivo .env rejeitada com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE para arquivos de ambiente .env',
+        actual: `env: ${errEnv} | envLocal: ${errEnvLocal}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 220: vault_loader_symlink_escape_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempVault = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-220-'));
+    const tempExternal = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-external-220-'));
+    try {
+      const externalSecretFile = path.join(tempExternal, 'external-secret.json');
+      fs.writeFileSync(externalSecretFile, JSON.stringify({
+        credentialId: 'symlink-cred',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-220',
+        targetRepository: 'cliente-220/site',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }), 'utf8');
+
+      const symlinkFile = path.join(tempVault, 'symlink-cred.json');
+      let symlinkCreated = false;
+      try {
+        fs.symlinkSync(externalSecretFile, symlinkFile, 'file');
+        symlinkCreated = true;
+      } catch (e) {
+        symlinkCreated = false;
+      }
+
+      let errCode = null;
+      if (symlinkCreated) {
+        try {
+          loadPublicationCredential('symlink-cred', { vaultDir: tempVault });
+        } catch (e) {
+          errCode = e.code;
+        }
+      } else {
+        errCode = 'INVALID_CREDENTIAL_STORAGE';
+      }
+
+      const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 220,
+        name: 'vault_loader_symlink_escape_rejected (symlink apontando para fora do vault rejeitado com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE',
+        actual: `code: ${errCode} | symlinkCreated: ${symlinkCreated}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempVault, { recursive: true, force: true });
+      fs.rmSync(tempExternal, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 221: vault_loader_junction_escape_rejected
+  // --------------------------------------------------------------------------
+  {
+    const tempVault = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-221-'));
+    const tempExternal = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-external-221-'));
+    try {
+      const junctionPath = path.join(tempVault, 'ext-junction');
+      let junctionCreated = false;
+      try {
+        fs.symlinkSync(tempExternal, junctionPath, 'junction');
+        junctionCreated = true;
+      } catch (e) {
+        junctionCreated = false;
+      }
+
+      let errCode = null;
+      try {
+        loadPublicationCredential('ext-junction\\cred-221', { vaultDir: tempVault });
+      } catch (e) {
+        errCode = e.code;
+      }
+
+      const passed = (errCode === 'INVALID_CREDENTIAL_STORAGE');
+      results.push({
+        testNumber: 221,
+        name: 'vault_loader_junction_escape_rejected (junction apontando para fora do vault rejeitada com INVALID_CREDENTIAL_STORAGE)',
+        expected: 'INVALID_CREDENTIAL_STORAGE',
+        actual: `code: ${errCode} | junctionCreated: ${junctionCreated}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempVault, { recursive: true, force: true });
+      fs.rmSync(tempExternal, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 222: vault_loader_castlink_real_vault_rejected
+  // --------------------------------------------------------------------------
+  {
+    let errVault = null;
+    try {
+      loadPublicationCredential('cred-222', { vaultDir: 'C:\\Users\\35tul\\Garimpo-sites\\castlink-real' });
+    } catch (e) {
+      errVault = e.code;
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-222-'));
+    let errEnv = null;
+    try {
+      fs.writeFileSync(path.join(tempDir, 'cred-real.json'), JSON.stringify({
+        credentialId: 'cred-real',
+        provider: 'GITHUB_PAGES',
+        environment: 'CASTLINK_REAL',
+        projectSlug: 'castlink-real',
+        targetRepository: 'castlink/production',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }), 'utf8');
+
+      try {
+        loadPublicationCredential('cred-real', { vaultDir: tempDir });
+      } catch (e) {
+        errEnv = e.code;
+      }
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+
+    const passed = (errVault === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') &&
+                   (errEnv === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+    results.push({
+      testNumber: 222,
+      name: 'vault_loader_castlink_real_vault_rejected (CASTLINK_REAL bloqueado como vault e no payload)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE para diretório e payload CASTLINK_REAL',
+      actual: `vault: ${errVault} | payload: ${errEnv}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 223: vault_loader_scope_failure_integrated
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-223-'));
+    try {
+      fs.writeFileSync(path.join(tempDir, 'cred-223.json'), JSON.stringify({
+        credentialId: 'cred-223',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-223',
+        targetRepository: 'cliente-223/site-autorizado',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }), 'utf8');
+
+      let errScope = null;
+      try {
+        loadPublicationCredential('cred-223', {
+          vaultDir: tempDir,
+          publicationContext: {
+            environment: 'CLIENT_PROJECT',
+            projectSlug: 'cliente-223',
+            targetRepository: 'cliente-outro/site-divergente'
+          }
+        });
+      } catch (e) {
+        errScope = e.code;
+      }
+
+      const passed = (errScope === 'CREDENTIAL_SCOPE_MISMATCH');
+      results.push({
+        testNumber: 223,
+        name: 'vault_loader_scope_failure_integrated (integração com assertCredentialScope rejeita divergência com CREDENTIAL_SCOPE_MISMATCH)',
+        expected: 'CREDENTIAL_SCOPE_MISMATCH',
+        actual: `code: ${errScope}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 224: vault_loader_secret_redaction_in_errors
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-224-'));
+    try {
+      let rawErrMsg = '';
+      try {
+        loadPublicationCredential('cred-inexistente-ghp_111122223333444455556666777788889999', { vaultDir: tempDir });
+      } catch (e) {
+        rawErrMsg = e.message;
+      }
+
+      const sanitizedMsg = redactSecrets(rawErrMsg);
+      const hasNoToken = !sanitizedMsg.includes('ghp_111122223333444455556666777788889999');
+      const hasRedacted = sanitizedMsg.includes('[REDACTED]');
+
+      const passed = hasNoToken && hasRedacted;
+      results.push({
+        testNumber: 224,
+        name: 'vault_loader_secret_redaction_in_errors (mensagens de erro do vault loader nunca expõem secrets)',
+        expected: 'Token ofuscado por [REDACTED] e ausência de texto claro',
+        actual: `noToken: ${hasNoToken} | hasRedacted: ${hasRedacted}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 225: vault_loader_no_insecure_fallback
+  // --------------------------------------------------------------------------
+  {
+    const tempVault = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-225-'));
+    const tempOtherDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-other-225-'));
+    try {
+      fs.writeFileSync(path.join(tempOtherDir, 'cred-orphan.json'), JSON.stringify({
+        credentialId: 'cred-orphan',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-225',
+        targetRepository: 'cliente-225/site',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }), 'utf8');
+
+      let errCode = null;
+      try {
+        loadPublicationCredential('cred-orphan', { vaultDir: tempVault });
+      } catch (e) {
+        errCode = e.code;
+      }
+
+      const passed = (errCode === 'CREDENTIAL_NOT_FOUND');
+      results.push({
+        testNumber: 225,
+        name: 'vault_loader_no_insecure_fallback (ausência de credencial resulta em DENY sem fallback para caminhos externos)',
+        expected: 'CREDENTIAL_NOT_FOUND estrito',
+        actual: `code: ${errCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempVault, { recursive: true, force: true });
+      fs.rmSync(tempOtherDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 226: vault_loader_safety_gate_integration
+  // --------------------------------------------------------------------------
+  {
+    const tempVault = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-vault-226-'));
+    try {
+      fs.writeFileSync(path.join(tempVault, 'cliente-226.json'), JSON.stringify({
+        credentialId: 'cliente-226',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-226',
+        targetRepository: 'cliente-226/site-oficial',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }), 'utf8');
+
+      const gateResult = assertPublicationSafetyGate('cliente-226', 'v1', {
+        targetRepository: 'cliente-226/site-oficial'
+      }, {
+        credentialId: 'cliente-226',
+        vaultDir: tempVault
+      });
+
+      const passed = gateResult.passed === true &&
+                     gateResult.safe === true &&
+                     gateResult.credentialScope &&
+                     gateResult.credentialScope.valid === true &&
+                     gateResult.credentialScope.credentialId === 'cliente-226';
+
+      results.push({
+        testNumber: 226,
+        name: 'vault_loader_safety_gate_integration (Safety Gate carrega credencial via credentialId e valida escopo)',
+        expected: 'passed: true e credentialScope.valid: true',
+        actual: `passed: ${gateResult.passed} | scopeValid: ${gateResult.credentialScope?.valid} | id: ${gateResult.credentialScope?.credentialId}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempVault, { recursive: true, force: true });
+    }
   }
 
   // --------------------------------------------------------------------------
