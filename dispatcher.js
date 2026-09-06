@@ -38,6 +38,7 @@ const {
   assertValidCanonicalDestination
 } = require('./site-builder');
 const productionPublisher = require('./production-publisher');
+const creativeGovernance = require('./creative-governance');
 
 const OFFICIAL_SENDER = 'paulonunes.consultoriadigital@gmail.com';
 const REQUIRED_APPROVER = 'Paulo Nunes';
@@ -3048,6 +3049,15 @@ module.exports = {
   assertProductionPublicationReady: productionPublisher.assertProductionPublicationReady,
   publishProductionSite: productionPublisher.publishProductionSite,
   calculateArtifactIntegrity: productionPublisher.calculateArtifactIntegrity,
+  assertArtifactIntegrityNotTampered: productionPublisher.assertArtifactIntegrityNotTampered,
+  validatePublicationTarget: productionPublisher.validatePublicationTarget,
+  validateCustomDomain: productionPublisher.validateCustomDomain,
+  formatCnameContent: productionPublisher.formatCnameContent,
+  acquirePublicationLock: productionPublisher.acquirePublicationLock,
+  releasePublicationLock: productionPublisher.releasePublicationLock,
+  isPublicationLockActive: productionPublisher.isPublicationLockActive,
+  generateHandoverDossier: productionPublisher.generateHandoverDossier,
+  creativeGovernance,
   ERR_PRODUCTION_EXECUTION_DISABLED: productionPublisher.ERR_PRODUCTION_EXECUTION_DISABLED,
   PUBLICATION_TARGET_PENDING: productionPublisher.PUBLICATION_TARGET_PENDING
 };

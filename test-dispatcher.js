@@ -62,9 +62,27 @@ const {
   assertProductionPublicationReady,
   publishProductionSite,
   calculateArtifactIntegrity,
+  assertArtifactIntegrityNotTampered,
+  validatePublicationTarget,
+  validateCustomDomain,
+  formatCnameContent,
+  acquirePublicationLock,
+  releasePublicationLock,
+  isPublicationLockActive,
+  generateHandoverDossier,
+  creativeGovernance,
   ERR_PRODUCTION_EXECUTION_DISABLED,
   PUBLICATION_TARGET_PENDING
 } = require('./dispatcher');
+
+const {
+  analyzeBrandContext,
+  generateCreativeDirection,
+  evaluateIdentityTest,
+  extractLayoutSignature,
+  compareLayoutSignatures,
+  assertNotTemplateClone
+} = require('./creative-governance');
 
 const {
   buildProductionSite,
@@ -4379,6 +4397,594 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       testNumber: 139,
       name: 'no_real_files_modified (Hashes dos arquivos reais de castlink-world permanecem 100% idênticos aos de referência)',
       expected: 'Todos os 4 hashes SHA-256 reais inalterados',
+      actual: `matchAll: ${matchAll}`,
+      passed: matchAll
+    });
+  }
+
+  // ==========================================================================
+  // TESTES DA FASE 6 — PUBLICAÇÃO CONTROLADA, ENTREGA E ANTI-TEMPLATE
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 140: Validação de Destino de Publicação Válido (Opção B - GitHub Pages)
+  // --------------------------------------------------------------------------
+  {
+    const target = {
+      provider: 'GITHUB_PAGES',
+      targetRepository: 'empresa-alfa/site-oficial',
+      targetBranch: 'main',
+      customDomain: 'www.empresa-alfa.com.br',
+      cnameRequired: true
+    };
+    const validated = validatePublicationTarget(target, 'empresa-alfa');
+    const passed = validated.configured === true &&
+                   validated.provider === 'GITHUB_PAGES' &&
+                   validated.targetRepository === 'empresa-alfa/site-oficial' &&
+                   validated.targetBranch === 'main' &&
+                   validated.customDomain === 'www.empresa-alfa.com.br' &&
+                   validated.ownershipModel === 'CLIENT_OWNERSHIP_OPTION_B' &&
+                   validated.cnameRequired === true;
+
+    results.push({
+      testNumber: 140,
+      name: 'validate_publication_target_github_pages_valid (Destino GitHub Pages isolado por cliente é validado com sucesso)',
+      expected: 'configured: true, GITHUB_PAGES, ownership: CLIENT_OWNERSHIP_OPTION_B, cnameRequired: true',
+      actual: `configured: ${validated.configured} | provider: ${validated.provider} | repo: ${validated.targetRepository} | ownership: ${validated.ownershipModel}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 141: Bloqueio de Repositório Central de Previews como Destino
+  // --------------------------------------------------------------------------
+  {
+    let blocked = false;
+    let errorCode = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'paulo80522-wq/previews-garimpo',
+        targetBranch: 'main'
+      }, 'empresa-alfa');
+    } catch (err) {
+      blocked = true;
+      errorCode = err.code;
+    }
+
+    const passed = blocked && errorCode === 'FORBIDDEN_TARGET_REPOSITORY';
+    results.push({
+      testNumber: 141,
+      name: 'validate_publication_target_forbids_previews_garimpo (Tentativa de usar previews-garimpo como destino de produção é bloqueada)',
+      expected: 'FORBIDDEN_TARGET_REPOSITORY',
+      actual: `code: ${errorCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 142: Bloqueio de Uso do Domínio de Teste castlink.world para Clientes
+  // --------------------------------------------------------------------------
+  {
+    let blocked = false;
+    let errorCode = null;
+    try {
+      validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'cliente-beta/website',
+        customDomain: 'castlink.world'
+      }, 'cliente-beta');
+    } catch (err) {
+      blocked = true;
+      errorCode = err.code;
+    }
+
+    const passed = blocked && errorCode === 'FORBIDDEN_CLIENT_DOMAIN';
+    results.push({
+      testNumber: 142,
+      name: 'validate_publication_target_forbids_castlink_world_for_clients (Uso de castlink.world para clientes externos é estritamente proibido)',
+      expected: 'FORBIDDEN_CLIENT_DOMAIN',
+      actual: `code: ${errorCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 143: Permissão de castlink.world Apenas para o Projeto de Teste
+  // --------------------------------------------------------------------------
+  {
+    let allowed = false;
+    try {
+      const validated = validatePublicationTarget({
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'paulo80522-wq/castlink-world-site',
+        customDomain: 'castlink.world'
+      }, 'castlink-world');
+      allowed = validated.customDomain === 'castlink.world';
+    } catch (err) {
+      allowed = false;
+    }
+
+    results.push({
+      testNumber: 143,
+      name: 'validate_publication_target_allows_castlink_world_for_castlink_test (castlink.world permitido exclusivamente para o projeto de teste/referência)',
+      expected: 'customDomain: castlink.world permitido para projeto castlink-world',
+      actual: `allowed: ${allowed}`,
+      passed: allowed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 144: Formatação de CNAME e Inclusão no Plano Determinístico
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-cname-test-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-cname-144', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-cname-144', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-cname-144', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-cname-144', true, { baseDir: tempDir, version: 'v2' });
+
+    const cnameContent = formatCnameContent('www.empresa-alfa.com.br', 'empresa-cname-144');
+    const plan = buildProductionPublicationPlan('empresa-cname-144', 'v2', {
+      baseDir: tempDir,
+      publicationTarget: {
+        provider: 'GITHUB_PAGES',
+        targetRepository: 'empresa-alfa/site-oficial',
+        targetBranch: 'main',
+        customDomain: 'www.empresa-alfa.com.br',
+        cnameRequired: true
+      }
+    });
+
+    const cnameFile = plan.expectedFiles.find(f => f.relativePath === 'CNAME');
+    const passed = cnameContent === 'www.empresa-alfa.com.br\n' &&
+                   Boolean(cnameFile) &&
+                   cnameFile.generated === true &&
+                   plan.targetConfigured === true;
+
+      results.push({
+        testNumber: 144,
+        name: 'cname_artifact_generation_and_planning (Geração e inclusão determinística do artefato CNAME no plano)',
+        expected: 'cnameContent: www.empresa-alfa.com.br\\n e arquivo CNAME presente no plano',
+        actual: `cnamePresent: ${Boolean(cnameFile)} | generated: ${cnameFile?.generated} | targetConfigured: ${plan.targetConfigured}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 145: Aquisição de Lock Concorrente e Bloqueio de Tentativa Simultânea
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-lock-test-'));
+    const projDir = path.join(tempDir, 'empresa-lock-145');
+    fs.mkdirSync(projDir, { recursive: true });
+
+    const lock1 = acquirePublicationLock('empresa-lock-145', 'v2', { baseDir: tempDir });
+    const isActive = isPublicationLockActive('empresa-lock-145', { baseDir: tempDir });
+
+    let blocked = false;
+    let errorCode = null;
+    try {
+      acquirePublicationLock('empresa-lock-145', 'v2', { baseDir: tempDir });
+    } catch (err) {
+      blocked = true;
+      errorCode = err.code;
+    }
+
+    releasePublicationLock('empresa-lock-145', { baseDir: tempDir });
+    const isReleased = isPublicationLockActive('empresa-lock-145', { baseDir: tempDir }).active === false;
+
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+
+    const passed = Boolean(lock1.pid) && isActive.active && blocked && errorCode === 'PUBLICATION_LOCK_ACTIVE' && isReleased;
+    results.push({
+      testNumber: 145,
+      name: 'publication_lock_acquisition_and_concurrency_block (Lock atômico com PID bloqueia publicação concorrente)',
+      expected: 'PUBLICATION_LOCK_ACTIVE no segundo acquire e liberação confirmada',
+      actual: `lockActive: ${isActive.active} | blocked: ${blocked} | code: ${errorCode} | released: ${isReleased}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 146: Limpeza Segura de Lock Expirado (TTL Excedido)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-lock-exp-'));
+    const projDir = path.join(tempDir, 'empresa-lock-exp-146');
+    fs.mkdirSync(projDir, { recursive: true });
+
+    const staleAcquiredTime = new Date(Date.now() - (10 * 60 * 1000)).toISOString(); // 10 minutos atrás
+    const staleLockPath = path.join(projDir, '.publication.lock');
+    fs.writeFileSync(staleLockPath, JSON.stringify({
+      pid: 99999,
+      projectSlug: 'empresa-lock-exp-146',
+      version: 'v2',
+      acquiredAt: staleAcquiredTime,
+      ttlMs: 5 * 60 * 1000
+    }, null, 2), 'utf8');
+
+    const statusBefore = isPublicationLockActive('empresa-lock-exp-146', { baseDir: tempDir });
+    const newLock = acquirePublicationLock('empresa-lock-exp-146', 'v2', { baseDir: tempDir });
+    const statusAfter = isPublicationLockActive('empresa-lock-exp-146', { baseDir: tempDir });
+
+    releasePublicationLock('empresa-lock-exp-146', { baseDir: tempDir });
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+
+    const passed = statusBefore.active === false &&
+                   statusBefore.expired === true &&
+                   newLock.pid === process.pid &&
+                   statusAfter.active === true;
+
+    results.push({
+      testNumber: 146,
+      name: 'publication_lock_expired_cleanup (Lock com TTL expirado é identificado como inativo e reciclado com segurança)',
+      expected: 'expired: true antes, nova aquisição bem sucedida',
+      actual: `beforeExpired: ${statusBefore.expired} | newPid: ${newLock.pid} | afterActive: ${statusAfter.active}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 147: Liberação Segura de Lock Inexistente ou Já Liberado
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-lock-rel-'));
+    const cleanResult = releasePublicationLock('empresa-inexistente-147', { baseDir: tempDir });
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+
+    results.push({
+      testNumber: 147,
+      name: 'publication_lock_release_safely (Tentativa de liberação de lock inexistente retorna false sem lançar exceção)',
+      expected: 'cleanResult: false sem erro',
+      actual: `cleanResult: ${cleanResult}`,
+      passed: cleanResult === false
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 148: Verificação de Integridade Criptográfica Anti-Adulteração
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-tamper-'));
+    const prodDir = path.join(tempDir, 'empresa-tamper-148', 'site-producao');
+    fs.mkdirSync(prodDir, { recursive: true });
+
+    fs.writeFileSync(path.join(prodDir, 'index.html'), '<html><body><h1>Original</h1></body></html>' + 'B'.repeat(200), 'utf8');
+    const integrity = calculateArtifactIntegrity(prodDir);
+
+    // Verificação com hash idêntico (deve passar)
+    const verified = assertArtifactIntegrityNotTampered(prodDir, integrity.aggregateSha256);
+
+    // Verificação com hash adulterado (deve lançar erro)
+    let tamperedBlocked = false;
+    let errorCode = null;
+    try {
+      assertArtifactIntegrityNotTampered(prodDir, 'HASH_FALSIFICADO_1234567890ABCDEF');
+    } catch (err) {
+      tamperedBlocked = true;
+      errorCode = err.code;
+    }
+
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+
+    const passed = verified.aggregateSha256 === integrity.aggregateSha256 &&
+                   tamperedBlocked &&
+                   errorCode === 'ARTIFACT_TAMPERED';
+
+    results.push({
+      testNumber: 148,
+      name: 'artifact_integrity_anti_tampering_assert (Bloqueio automático se artefato divergir do hash homologado)',
+      expected: 'ARTIFACT_TAMPERED quando hash for inconsistente',
+      actual: `verified: ${verified.aggregateSha256 === integrity.aggregateSha256} | tamperedBlocked: ${tamperedBlocked} | code: ${errorCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 149: Dossiê de Handover e Ciclo de Vida em 5 Etapas (Opção B)
+  // --------------------------------------------------------------------------
+  {
+    const dossier = generateHandoverDossier('empresa-handover-149', 'v2', {
+      provider: 'GITHUB_PAGES',
+      targetRepository: 'cliente-delta/site-oficial',
+      customDomain: 'www.cliente-delta.com'
+    });
+
+    const has5Stages = dossier.lifecycleStages.length === 5;
+    const stageNames = dossier.lifecycleStages.map(s => s.stage);
+    const expectedStages = ['1_DESENVOLVIMENTO', '2_HOMOLOGACAO', '3_PUBLICACAO', '4_HANDOVER', '5_OPERACAO'];
+    const stagesMatch = expectedStages.every(s => stageNames.includes(s));
+    const passed = has5Stages &&
+                   stagesMatch &&
+                   dossier.ownershipModel === 'CLIENT_OWNERSHIP_OPTION_B' &&
+                   dossier.securityPolicy.zeroBackdoors === true &&
+                   dossier.securityPolicy.clientOwnershipConfirmed === true &&
+                   dossier.infrastructure.cnameArtifact.includes('www.cliente-delta.com');
+
+    results.push({
+      testNumber: 149,
+      name: 'handover_dossier_5_stages_and_option_b (Dossiê formal de handover com 5 etapas e política soberana do cliente)',
+      expected: '5 etapas completas, CLIENT_OWNERSHIP_OPTION_B, zeroBackdoors: true',
+      actual: `stages: ${dossier.lifecycleStages.length} | model: ${dossier.ownershipModel} | backdoors: ${!dossier.securityPolicy.zeroBackdoors}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 150: Análise de Contexto de Marca por Setor
+  // --------------------------------------------------------------------------
+  {
+    const ctxFashion = analyzeBrandContext({ companyName: 'Maison Luxe', sector: 'Alta Moda e Joalheria' });
+    const ctxLegal = analyzeBrandContext({ companyName: 'Silva & Associados', sector: 'Advocacia e Consultoria Jurídica' });
+    const ctxTech = analyzeBrandContext({ companyName: 'CloudMatrix', sector: 'SaaS e Inteligência Artificial' });
+    const ctxArtisan = analyzeBrandContext({ companyName: 'Atelier Madeira Viva', sector: 'Marcenaria Artesanal de Luxo' });
+
+    const passed = ctxFashion.suggestedArchetype === 'LUXURY_EDITORIAL' &&
+                   ctxLegal.suggestedArchetype === 'SOBER_INSTITUTIONAL' &&
+                   ctxTech.suggestedArchetype === 'BOLD_TECH' &&
+                   ctxArtisan.suggestedArchetype === 'WARM_ARTISANAL';
+
+    results.push({
+      testNumber: 150,
+      name: 'creative_governance_brand_context_analysis (Classificação contextual de arquétipos por setor do negócio)',
+      expected: 'LUXURY_EDITORIAL, SOBER_INSTITUTIONAL, BOLD_TECH, WARM_ARTISANAL',
+      actual: `fashion: ${ctxFashion.suggestedArchetype} | legal: ${ctxLegal.suggestedArchetype} | tech: ${ctxTech.suggestedArchetype} | artisan: ${ctxArtisan.suggestedArchetype}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 151: Geração de Direção Criativa Específica
+  // --------------------------------------------------------------------------
+  {
+    const dirFashion = generateCreativeDirection({ companyName: 'Maison Luxe', sector: 'moda de luxo' });
+    const dirLegal = generateCreativeDirection({ companyName: 'Lex Soares', sector: 'advocacia' });
+
+    const distinctPalettes = dirFashion.palette.primary !== dirLegal.palette.primary;
+    const distinctTypography = dirFashion.typography.headlineFont !== dirLegal.typography.headlineFont;
+    const distinctHeros = dirFashion.heroArchetype !== dirLegal.heroArchetype;
+    const distinctSequences = JSON.stringify(dirFashion.sectionSequence) !== JSON.stringify(dirLegal.sectionSequence);
+
+    const passed = distinctPalettes && distinctTypography && distinctHeros && distinctSequences;
+    results.push({
+      testNumber: 151,
+      name: 'creative_governance_creative_direction_generation (Direção criativa gera paletas, tipografias, heros e seções distintas)',
+      expected: 'Divergência estética contextual completa entre moda e advocacia',
+      actual: `palettesDistinct: ${distinctPalettes} | typoDistinct: ${distinctTypography} | herosDistinct: ${distinctHeros} | seqDistinct: ${distinctSequences}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 152: O Teste de Identidade da Marca (Aprovação vs. Rejeição Genérica)
+  // --------------------------------------------------------------------------
+  {
+    const goodDirection = generateCreativeDirection({
+      companyName: 'Boutique CastLink',
+      sector: 'moda editorial de passarela',
+      valueProposition: 'Composites digitais e casting de alta costura'
+    });
+    const goodTest = evaluateIdentityTest(goodDirection);
+
+    const genericDirection = {
+      conceptName: 'Site Genérico',
+      archetype: 'COMMERCIAL_DYNAMIC',
+      sector: 'generic',
+      palette: {},
+      typography: {}
+    };
+    const badTest = evaluateIdentityTest(genericDirection);
+
+    const passed = goodTest.passed === true &&
+                   goodTest.verdict === 'DISTINCTIVE_AND_CONTEXTUAL' &&
+                   badTest.passed === false &&
+                   badTest.verdict === 'INSUFFICIENTLY_CONTEXTUALIZED';
+
+    results.push({
+      testNumber: 152,
+      name: 'creative_governance_identity_test_evaluation (Teste de Identidade aprova design contextual e rejeita templates genéricos)',
+      expected: 'goodTest: DISTINCTIVE_AND_CONTEXTUAL, badTest: INSUFFICIENTLY_CONTEXTUALIZED',
+      actual: `goodVerdict: ${goodTest.verdict} | badVerdict: ${badTest.verdict}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 153: Extração de Assinatura Estrutural do DOM (DOM Fingerprinting)
+  // --------------------------------------------------------------------------
+  {
+    const htmlSample = `
+      <!DOCTYPE html>
+      <html>
+      <body>
+        <aside class="fashion-ticker"></aside>
+        <header id="main-header"><span class="brand-subtitle">comp card</span></header>
+        <section id="hero" class="hero-split"></section>
+        <section id="curated-acts"></section>
+        <form id="vip-form"></form>
+        <footer id="colophon"></footer>
+      </body>
+      </html>
+    `;
+    const sig = extractLayoutSignature(htmlSample);
+    const passed = sig.heroType === 'HERO_SPLIT_EDITORIAL' &&
+                   sig.sectionSequence.length >= 5 &&
+                   sig.componentSignatures.includes('FORM_CONTAINER') &&
+                   typeof sig.signatureHash === 'string' &&
+                   sig.signatureHash.length === 64;
+
+    results.push({
+      testNumber: 153,
+      name: 'creative_governance_layout_signature_extraction (Extração precisa da assinatura semântica e hash estrutural do DOM)',
+      expected: 'heroType: HERO_SPLIT_EDITORIAL, hash de 64 caracteres, FORM_CONTAINER presente',
+      actual: `hero: ${sig.heroType} | sections: ${sig.sectionSequence.length} | hashLen: ${sig.signatureHash.length}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 154: Detecção Anti-Template de Clones Visuais (Alta Similaridade)
+  // --------------------------------------------------------------------------
+  {
+    const htmlA = `
+      <header id="h1"></header>
+      <section id="hero" class="hero-split"></section>
+      <section id="acts"></section>
+      <section id="comparison"></section>
+      <footer id="f1"></footer>
+    `;
+    // HTML B com apenas troca de textos e IDs menores, mas mesma sequência e hero
+    const htmlB = `
+      <header id="h1"></header>
+      <section id="hero" class="hero-split"></section>
+      <section id="acts"></section>
+      <section id="comparison"></section>
+      <footer id="f1"></footer>
+    `;
+
+    const sigA = extractLayoutSignature(htmlA);
+    const sigB = extractLayoutSignature(htmlB);
+    const comparison = compareLayoutSignatures(sigA, sigB);
+
+    let assertThrown = false;
+    let errorCode = null;
+    try {
+      assertNotTemplateClone(sigA, sigB);
+    } catch (err) {
+      assertThrown = true;
+      errorCode = err.code;
+    }
+
+    const passed = comparison.isTemplateClone === true &&
+                   comparison.similarityScore >= 0.85 &&
+                   assertThrown &&
+                   errorCode === 'EXCESSIVE_VISUAL_HOMOGENEITY';
+
+    results.push({
+      testNumber: 154,
+      name: 'creative_governance_anti_template_clone_detection (Mecanismo Anti-Template bloqueia cópia de estrutura entre sites)',
+      expected: 'isTemplateClone: true, score >= 0.85, erro EXCESSIVE_VISUAL_HOMOGENEITY',
+      actual: `clone: ${comparison.isTemplateClone} | score: ${comparison.similarityScore} | error: ${errorCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 155: Aprovação de Projetos com Layouts e Assinaturas Distintas
+  // --------------------------------------------------------------------------
+  {
+    const htmlFashion = `
+      <aside class="fashion-ticker"></aside>
+      <header class="masthead"></header>
+      <section id="hero-editorial" class="hero-split"></section>
+      <section id="runway-acts"></section>
+      <section id="atelier-models"></section>
+      <footer id="editorial-footer"></footer>
+    `;
+    const htmlLegal = `
+      <header class="legal-nav"></header>
+      <section id="hero-authority"></section>
+      <section id="practice-areas"></section>
+      <section id="partners-dossier"></section>
+      <section id="credentials-stats"></section>
+      <section id="legal-consultation"></section>
+      <footer id="institutional-footer"></footer>
+    `;
+
+    const sigFashion = extractLayoutSignature(htmlFashion);
+    const sigLegal = extractLayoutSignature(htmlLegal);
+    const comparison = compareLayoutSignatures(sigFashion, sigLegal);
+    const approved = assertNotTemplateClone(sigFashion, sigLegal);
+
+    const passed = comparison.isTemplateClone === false &&
+                   comparison.similarityScore < 0.60 &&
+                   approved.verdict === 'AUTHENTIC_INDIVIDUAL_DESIGN';
+
+    results.push({
+      testNumber: 155,
+      name: 'creative_governance_distinct_designs_pass_anti_template (Projetos contextualmente distintos são aprovados sem restrições)',
+      expected: 'isTemplateClone: false, similarityScore < 0.60, AUTHENTIC_INDIVIDUAL_DESIGN',
+      actual: `clone: ${comparison.isTemplateClone} | score: ${comparison.similarityScore} | verdict: ${approved.verdict}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 156: Garantia de Segurança e Bloqueio de Execução Real Preservados
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-156-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-156', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-156', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-156', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-156', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('empresa-plan-156', 'v2', { baseDir: tempDir });
+      let executionBlocked = false;
+      let errorCode = null;
+
+      try {
+        publishProductionSite('empresa-plan-156', 'v2');
+      } catch (err) {
+        executionBlocked = true;
+        errorCode = err.code;
+      }
+
+      const passed = plan.dryRun === true &&
+                     plan.executionAllowed === false &&
+                     plan.executionBlockReason === ERR_PRODUCTION_EXECUTION_DISABLED &&
+                     executionBlocked &&
+                     errorCode === ERR_PRODUCTION_EXECUTION_DISABLED;
+
+      results.push({
+        testNumber: 156,
+        name: 'safety_execution_still_categorically_disabled_dry_run (dryRun=true e bloqueio de execução real permanecem 100% ativos)',
+        expected: 'dryRun: true, executionAllowed: false, PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+        actual: `dryRun: ${plan.dryRun} | executionAllowed: ${plan.executionAllowed} | code: ${errorCode}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 157: Integridade Final dos Hashes Reais de Produção (castlink-world)
+  // --------------------------------------------------------------------------
+  {
+    const realDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\site-producao';
+    const realManifestPath = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\manifest.json';
+
+    const refHashes = {
+      index: '3906EDED896640B58994A25DA0D4BA01F049FA4B5F98C06EA0E59A1E3470F5C1',
+      script: '0656979CE0E669BC2ED3F21F1FBC60E37EB4F3E8EF4C2320639FADBBBC24BBA3',
+      styles: '006EB504A993AE1F100862EF4B17CF1147440F7392221F16B011EF59CA15F1F6',
+      manifest: '9A8D7D25C5355C163F20643239555DEF11BC5CB58A6B9B3BE177E22984275875'
+    };
+
+    let matchAll = false;
+    if (fs.existsSync(realDir) && fs.existsSync(realManifestPath)) {
+      const indexSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'index.html'))).digest('hex').toUpperCase();
+      const scriptSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'script.js'))).digest('hex').toUpperCase();
+      const stylesSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realDir, 'styles.css'))).digest('hex').toUpperCase();
+      const manifestSha = crypto.createHash('sha256').update(fs.readFileSync(realManifestPath)).digest('hex').toUpperCase();
+
+      matchAll = (indexSha === refHashes.index) &&
+                 (scriptSha === refHashes.script) &&
+                 (stylesSha === refHashes.styles) &&
+                 (manifestSha === refHashes.manifest);
+    }
+
+    results.push({
+      testNumber: 157,
+      name: 'no_real_files_modified_post_phase_6 (Arquivos canônicos de castlink-world permanecem 100% íntegros pós-Fase 6)',
+      expected: 'Hashes SHA-256 de index, script, styles e manifest inalterados',
       actual: `matchAll: ${matchAll}`,
       passed: matchAll
     });
