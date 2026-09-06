@@ -2985,7 +2985,7 @@ if (require.main === module) {
       process.exitCode = 1;
     }
   }).catch(err => {
-    console.error('Erro na execução do dispatcher:', err);
+    console.error('Erro na execução do dispatcher:', productionPublisher.redactSecrets(err.message || err));
     process.exitCode = 1;
   });
 }
@@ -3068,6 +3068,7 @@ module.exports = {
   isProtectedDomain: productionPublisher.isProtectedDomain,
   assertDomainNotProtected: productionPublisher.assertDomainNotProtected,
   resolveEnvironmentType: productionPublisher.resolveEnvironmentType,
+  assertCanonicalProductionSource: productionPublisher.assertCanonicalProductionSource,
   assertPublicationSafetyGate: productionPublisher.assertPublicationSafetyGate,
   executeControlledPublication: productionPublisher.executeControlledPublication,
   REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED: productionPublisher.REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED,
@@ -3079,5 +3080,14 @@ module.exports = {
   ERR_UNAUTHORIZED_TARGET_DESTINATION: productionPublisher.ERR_UNAUTHORIZED_TARGET_DESTINATION,
   ERR_FORBIDDEN_LAB_INFRASTRUCTURE: productionPublisher.ERR_FORBIDDEN_LAB_INFRASTRUCTURE,
   ERR_FORBIDDEN_CLIENT_DOMAIN: productionPublisher.ERR_FORBIDDEN_CLIENT_DOMAIN,
-  ERR_MISSING_TARGET_REPOSITORY: productionPublisher.ERR_MISSING_TARGET_REPOSITORY
+  ERR_MISSING_TARGET_REPOSITORY: productionPublisher.ERR_MISSING_TARGET_REPOSITORY,
+  ERR_MISSING_PUBLICATION_CREDENTIAL: productionPublisher.ERR_MISSING_PUBLICATION_CREDENTIAL,
+  ERR_INVALID_CREDENTIAL_ENVELOPE: productionPublisher.ERR_INVALID_CREDENTIAL_ENVELOPE,
+  ERR_CREDENTIAL_EXPIRED: productionPublisher.ERR_CREDENTIAL_EXPIRED,
+  ERR_CREDENTIAL_ENVIRONMENT_MISMATCH: productionPublisher.ERR_CREDENTIAL_ENVIRONMENT_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_MISMATCH: productionPublisher.ERR_CREDENTIAL_SCOPE_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_EXCESSIVE: productionPublisher.ERR_CREDENTIAL_SCOPE_EXCESSIVE,
+  FORBIDDEN_ADMIN_SCOPES: productionPublisher.FORBIDDEN_ADMIN_SCOPES,
+  redactSecrets: productionPublisher.redactSecrets,
+  assertCredentialScope: productionPublisher.assertCredentialScope
 };

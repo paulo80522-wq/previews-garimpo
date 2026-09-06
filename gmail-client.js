@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { redactSecrets } = require('./production-publisher');
 
 const DEFAULT_CREDENTIALS_DIR = 'C:\\Users\\35tul\\.gemini\\config\\credentials\\gmail';
 const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
@@ -249,7 +250,7 @@ function refreshAccessToken(clientConfig, tokenData) {
             reject(new Error(`Erro ao interpretar resposta do Google Token: ${e.message}`));
           }
         } else {
-          reject(new Error(`Falha no refresh de token Google (HTTP ${res.statusCode}): ${data}`));
+          reject(new Error(`Falha no refresh de token Google (HTTP ${res.statusCode}): ${redactSecrets(data)}`));
         }
       });
     });
@@ -349,7 +350,7 @@ async function sendViaGmailApi(emailPayload, options = {}) {
             reject(new Error(`Erro ao interpretar resposta da Gmail API: ${e.message}`));
           }
         } else {
-          reject(new Error(`Falha no envio da Gmail API (HTTP ${res.statusCode}): ${data}`));
+          reject(new Error(`Falha no envio da Gmail API (HTTP ${res.statusCode}): ${redactSecrets(data)}`));
         }
       });
     });

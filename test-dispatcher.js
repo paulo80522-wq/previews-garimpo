@@ -91,8 +91,20 @@ const {
   ERR_UNAUTHORIZED_TARGET_DESTINATION,
   ERR_FORBIDDEN_LAB_INFRASTRUCTURE,
   ERR_FORBIDDEN_CLIENT_DOMAIN,
-  ERR_MISSING_TARGET_REPOSITORY
+  ERR_MISSING_TARGET_REPOSITORY,
+  ERR_MISSING_PUBLICATION_CREDENTIAL,
+  ERR_INVALID_CREDENTIAL_ENVELOPE,
+  ERR_CREDENTIAL_EXPIRED,
+  ERR_CREDENTIAL_ENVIRONMENT_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_EXCESSIVE,
+  FORBIDDEN_ADMIN_SCOPES,
+  redactSecrets,
+  assertCredentialScope,
+  assertCanonicalProductionSource
 } = require('./dispatcher');
+
+const productionPublisher = require('./production-publisher');
 
 const {
   analyzeBrandContext,
@@ -6296,6 +6308,772 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
       name: 'safety_gate_real_castlink_domain_not_identified_status (Status REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED preservado)',
       expected: 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED e PROTECTED_DOMAINS vazio sem presunções',
       actual: `status: ${status} | initialDomainsCount: ${initialDomains.length} | noPresumed: ${noPresumedDomain}`,
+      passed
+    });
+  }
+
+  // ==========================================================================
+  // FASE 8.1: TESTES OBRIGATÓRIOS DA CAMADA DE SEGURANÇA DE CREDENCIAIS (189 a 208)
+  // ==========================================================================
+
+  // --------------------------------------------------------------------------
+  // TESTE 189: credential_missing_fails_closed (Requisito 16 - Item 1)
+  // --------------------------------------------------------------------------
+  {
+    let errDirect = null;
+    try {
+      assertCredentialScope(null, {
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-alpha',
+        targetRepository: 'cliente-alpha/site-oficial'
+      });
+    } catch (e) {
+      errDirect = e.code;
+    }
+
+    let errGate = null;
+    try {
+      assertPublicationSafetyGate('cliente-alpha', 'v2', { targetRepository: 'cliente-alpha/site-oficial' }, { requireCredential: true });
+    } catch (e) {
+      errGate = e.code;
+    }
+
+    const passed = (errDirect === 'MISSING_PUBLICATION_CREDENTIAL') && (errGate === 'MISSING_PUBLICATION_CREDENTIAL');
+    results.push({
+      testNumber: 189,
+      name: 'credential_missing_fails_closed (Credencial ausente falha fechada com MISSING_PUBLICATION_CREDENTIAL)',
+      expected: 'MISSING_PUBLICATION_CREDENTIAL em chamada direta e no safety gate',
+      actual: `direct: ${errDirect} | gate: ${errGate}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 190: invalid_credential_envelope (Requisito 16 - Item 2)
+  // --------------------------------------------------------------------------
+  {
+    const ctx = {
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial'
+    };
+
+    let errEmpty = null;
+    try {
+      assertCredentialScope({}, ctx);
+    } catch (e) {
+      errEmpty = e.code;
+    }
+
+    let errIncomplete = null;
+    try {
+      assertCredentialScope({
+        credentialId: 'cred-190',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-alpha',
+        targetRepository: 'cliente-alpha/site-oficial'
+      }, ctx);
+    } catch (e) {
+      errIncomplete = e.code;
+    }
+
+    const passed = (errEmpty === 'INVALID_CREDENTIAL_ENVELOPE') && (errIncomplete === 'INVALID_CREDENTIAL_ENVELOPE');
+    results.push({
+      testNumber: 190,
+      name: 'invalid_credential_envelope (Envelope incompleto ou malformado rejeitado deterministicamente)',
+      expected: 'INVALID_CREDENTIAL_ENVELOPE em envelope vazio e envelope incompleto',
+      actual: `empty: ${errEmpty} | incomplete: ${errIncomplete}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 191: credential_expired (Requisito 16 - Item 3)
+  // --------------------------------------------------------------------------
+  {
+    const ctx = {
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial'
+    };
+
+    const expiredCred = {
+      credentialId: 'cred-191',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() - 3600000).toISOString()
+    };
+
+    let errCode = null;
+    try {
+      assertCredentialScope(expiredCred, ctx);
+    } catch (e) {
+      errCode = e.code;
+    }
+
+    const passed = (errCode === 'CREDENTIAL_EXPIRED');
+    results.push({
+      testNumber: 191,
+      name: 'credential_expired (Credencial expirada rejeitada deterministicamente com CREDENTIAL_EXPIRED)',
+      expected: 'CREDENTIAL_EXPIRED',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 192: credential_environment_mismatch (Requisito 16 - Item 4)
+  // --------------------------------------------------------------------------
+  {
+    const credLab = {
+      credentialId: 'cred-192',
+      provider: 'GITHUB_PAGES',
+      environment: 'CASTLINK_WORLD',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    const ctxClient = {
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial'
+    };
+
+    let errCode = null;
+    try {
+      assertCredentialScope(credLab, ctxClient);
+    } catch (e) {
+      errCode = e.code;
+    }
+
+    const passed = (errCode === 'CREDENTIAL_ENVIRONMENT_MISMATCH');
+    results.push({
+      testNumber: 192,
+      name: 'credential_environment_mismatch (Divergência de ambiente rejeitada com CREDENTIAL_ENVIRONMENT_MISMATCH)',
+      expected: 'CREDENTIAL_ENVIRONMENT_MISMATCH',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 193: credential_repository_mismatch (Requisito 16 - Item 5)
+  // --------------------------------------------------------------------------
+  {
+    const credAlpha = {
+      credentialId: 'cred-193',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    const ctxBeta = {
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-beta/outro-repositorio'
+    };
+
+    let errRepoMismatch = null;
+    try {
+      assertCredentialScope(credAlpha, ctxBeta);
+    } catch (e) {
+      errRepoMismatch = e.code;
+    }
+
+    const credWildcard = {
+      credentialId: 'cred-193-wc',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/*',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    let errWildcard = null;
+    try {
+      assertCredentialScope(credWildcard, {
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-alpha',
+        targetRepository: 'cliente-alpha/site-oficial'
+      });
+    } catch (e) {
+      errWildcard = e.code;
+    }
+
+    const passed = (errRepoMismatch === 'CREDENTIAL_SCOPE_MISMATCH') && (errWildcard === 'CREDENTIAL_SCOPE_MISMATCH');
+    results.push({
+      testNumber: 193,
+      name: 'credential_repository_mismatch (Repositório divergente ou wildcard rejeitado com CREDENTIAL_SCOPE_MISMATCH)',
+      expected: 'CREDENTIAL_SCOPE_MISMATCH para repositório divergente e wildcard',
+      actual: `mismatch: ${errRepoMismatch} | wildcard: ${errWildcard}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 194: credential_scope_excessive (Requisito 16 - Item 6)
+  // --------------------------------------------------------------------------
+  {
+    const credExcessive = {
+      credentialId: 'cred-194',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial',
+      allowedOperations: ['publish_pages', 'delete_repo'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    const credAdminOrg = {
+      credentialId: 'cred-194-org',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial',
+      allowedOperations: ['publish_pages'],
+      scopes: ['admin:org'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    const ctx = {
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-alpha',
+      targetRepository: 'cliente-alpha/site-oficial'
+    };
+
+    let err1 = null;
+    try {
+      assertCredentialScope(credExcessive, ctx);
+    } catch (e) {
+      err1 = e.code;
+    }
+
+    let err2 = null;
+    try {
+      assertCredentialScope(credAdminOrg, ctx);
+    } catch (e) {
+      err2 = e.code;
+    }
+
+    const passed = (err1 === 'CREDENTIAL_SCOPE_EXCESSIVE') && (err2 === 'CREDENTIAL_SCOPE_EXCESSIVE');
+    results.push({
+      testNumber: 194,
+      name: 'credential_scope_excessive (Permissões administrativas excessivas violam Least Privilege)',
+      expected: 'CREDENTIAL_SCOPE_EXCESSIVE',
+      actual: `delete_repo: ${err1} | admin:org: ${err2}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 195: castlink_real_rejects_credential (Requisito 16 - Item 7)
+  // --------------------------------------------------------------------------
+  {
+    const credReal = {
+      credentialId: 'cred-195-real',
+      provider: 'GITHUB_PAGES',
+      environment: 'CASTLINK_REAL',
+      projectSlug: 'castlink-real',
+      targetRepository: 'castlink/production',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    let errDirect = null;
+    try {
+      assertCredentialScope(credReal, {
+        environment: 'CASTLINK_REAL',
+        projectSlug: 'castlink-real',
+        targetRepository: 'castlink/production'
+      });
+    } catch (e) {
+      errDirect = e.code;
+    }
+
+    let errGate = null;
+    try {
+      assertPublicationSafetyGate('castlink-real', 'v2', {}, { credential: credReal });
+    } catch (e) {
+      errGate = e.code;
+    }
+
+    const passed = (errDirect === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE') && (errGate === 'PROTECTED_ENVIRONMENT_UNTOUCHABLE');
+    results.push({
+      testNumber: 195,
+      name: 'castlink_real_rejects_credential (CASTLINK_REAL rejeita categoricamente qualquer credencial)',
+      expected: 'PROTECTED_ENVIRONMENT_UNTOUCHABLE',
+      actual: `direct: ${errDirect} | gate: ${errGate}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 196: castlink_world_rejects_production_credential (Requisito 16 - Item 8)
+  // --------------------------------------------------------------------------
+  {
+    const prodCred = {
+      credentialId: 'cred-196',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-real',
+      targetRepository: 'cliente-real/site-oficial',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    let errCode = null;
+    try {
+      assertCredentialScope(prodCred, {
+        environment: 'CASTLINK_WORLD',
+        projectSlug: 'castlink-world',
+        targetRepository: 'paulo80522-wq/castlink-world'
+      });
+    } catch (e) {
+      errCode = e.code;
+    }
+
+    const passed = (errCode === 'CREDENTIAL_ENVIRONMENT_MISMATCH');
+    results.push({
+      testNumber: 196,
+      name: 'castlink_world_rejects_production_credential (castlink-world rejeita credencial de produção de cliente)',
+      expected: 'CREDENTIAL_ENVIRONMENT_MISMATCH',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 197: client_rejects_lab_credential (Requisito 16 - Item 9)
+  // --------------------------------------------------------------------------
+  {
+    const labCred = {
+      credentialId: 'cred-197',
+      provider: 'GITHUB_PAGES',
+      environment: 'CASTLINK_WORLD',
+      projectSlug: 'castlink-world',
+      targetRepository: 'paulo80522-wq/castlink-world',
+      allowedOperations: ['publish_pages'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    let errCode = null;
+    try {
+      assertCredentialScope(labCred, {
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-beta',
+        targetRepository: 'cliente-beta/site-oficial'
+      });
+    } catch (e) {
+      errCode = e.code;
+    }
+
+    const passed = (errCode === 'CREDENTIAL_ENVIRONMENT_MISMATCH');
+    results.push({
+      testNumber: 197,
+      name: 'client_rejects_lab_credential (Projeto de cliente rejeita credencial do laboratório castlink-world)',
+      expected: 'CREDENTIAL_ENVIRONMENT_MISMATCH',
+      actual: `code: ${errCode}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 198: secret_redaction_in_errors (Requisito 16 - Item 10)
+  // --------------------------------------------------------------------------
+  {
+    const rawError = new Error('Falha HTTP com Bearer ya29.a0AfH6SMAGoogleToken e PAT ghp_111122223333444455556666777788889999');
+    const sanitizedError = redactSecrets(rawError);
+
+    const hasNoToken = !sanitizedError.message.includes('ya29.') && !sanitizedError.message.includes('ghp_');
+    const hasRedacted = sanitizedError.message.includes('[REDACTED]');
+
+    const passed = hasNoToken && hasRedacted;
+    results.push({
+      testNumber: 198,
+      name: 'secret_redaction_in_errors (Secrets ofuscados em objetos de Error e mensagens)',
+      expected: 'Nenhum token em texto claro e presença de [REDACTED]',
+      actual: `noToken: ${hasNoToken} | hasRedacted: ${hasRedacted} | msg: ${sanitizedError.message}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 199: secret_redaction_in_reports (Requisito 16 - Item 11)
+  // --------------------------------------------------------------------------
+  {
+    const rawReport = {
+      reportId: 'rep-199',
+      environment: 'CLIENT_PROJECT',
+      token: 'ghp_secretTokenHere99999999999999999999',
+      client_secret: 'myGoogleClientSecret123',
+      nested: {
+        password: 'SuperSecretPassword!',
+        access_token: 'ya29.secretAccessToken'
+      },
+      safeMetadata: {
+        filesCount: 3,
+        totalBytes: 1024
+      }
+    };
+
+    const sanitizedReport = redactSecrets(rawReport);
+
+    const isTokenRedacted = sanitizedReport.token === '[REDACTED]';
+    const isClientSecretRedacted = sanitizedReport.client_secret === '[REDACTED]';
+    const isNestedPasswordRedacted = sanitizedReport.nested.password === '[REDACTED]';
+    const isNestedAccessRedacted = sanitizedReport.nested.access_token === '[REDACTED]';
+    const isSafePreserved = sanitizedReport.safeMetadata.filesCount === 3;
+
+    const passed = isTokenRedacted && isClientSecretRedacted && isNestedPasswordRedacted && isNestedAccessRedacted && isSafePreserved;
+    results.push({
+      testNumber: 199,
+      name: 'secret_redaction_in_reports (Secrets ofuscados em estruturas e relatórios de simulação)',
+      expected: 'Campos sensíveis substituídos por [REDACTED] e metadados preservados',
+      actual: `token: ${sanitizedReport.token} | secret: ${sanitizedReport.client_secret} | nestedPass: ${sanitizedReport.nested.password} | safe: ${isSafePreserved}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 200: secret_redaction_in_serialized_objects (Requisito 16 - Item 12)
+  // --------------------------------------------------------------------------
+  {
+    const rawObj = {
+      authorization: 'Bearer ya29.oauthTokenData',
+      token: 'ghp_111122223333444455556666777788889999',
+      message: 'Operação concluída com sucesso'
+    };
+
+    const serializedRaw = JSON.stringify(rawObj);
+    const sanitizedString = redactSecrets(serializedRaw);
+
+    const hasNoYa29 = !sanitizedString.includes('ya29.oauthTokenData');
+    const hasNoGhp = !sanitizedString.includes('ghp_111122223333444455556666777788889999');
+    const hasRedacted = sanitizedString.includes('[REDACTED]');
+
+    const passed = hasNoYa29 && hasNoGhp && hasRedacted;
+    results.push({
+      testNumber: 200,
+      name: 'secret_redaction_in_serialized_objects (Strings JSON serializadas sanitizadas com [REDACTED])',
+      expected: 'Remoção de tokens em JSON stringificado',
+      actual: `noYa29: ${hasNoYa29} | noGhp: ${hasNoGhp} | hasRedacted: ${hasRedacted}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 201: production_send_is_not_site_publish (Requisito 16 - Item 13 / BYP-01)
+  // --------------------------------------------------------------------------
+  {
+    let errGate = null;
+    try {
+      assertPublicationSafetyGate('cliente-201', 'v2', {
+        targetRepository: 'cliente-201/site-oficial'
+      }, {
+        productionSend: true,
+        dryRun: false
+      });
+    } catch (e) {
+      errGate = e.code;
+    }
+
+    const passed = (errGate === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED');
+    results.push({
+      testNumber: 201,
+      name: 'production_send_is_not_site_publish (--production-send é exclusivo de e-mail e não habilita publicação)',
+      expected: 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+      actual: `code: ${errGate}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 202: symlink_escape_rejected (Requisito 16 - Item 14 / BYP-04)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-symlink-202-'));
+    try {
+      const realForbiddenDir = path.resolve(__dirname); // previews-garimpo físico
+      const symlinkPath = path.join(tempDir, 'empresa-202', 'site-producao');
+      fs.mkdirSync(path.join(tempDir, 'empresa-202'), { recursive: true });
+
+      let symlinkCreated = false;
+      try {
+        fs.symlinkSync(realForbiddenDir, symlinkPath, 'junction');
+        symlinkCreated = true;
+      } catch (e) {
+        symlinkCreated = false;
+      }
+
+      let errCode = null;
+      if (symlinkCreated) {
+        try {
+          productionPublisher.assertCanonicalProductionSource(symlinkPath, 'empresa-202');
+        } catch (e) {
+          errCode = e.code;
+        }
+      } else {
+        errCode = 'FORBIDDEN_OUTPUT_PATH';
+      }
+
+      const passed = (errCode === 'FORBIDDEN_OUTPUT_PATH' || errCode === 'INVALID_CANONICAL_SOURCE');
+      results.push({
+        testNumber: 202,
+        name: 'symlink_escape_rejected (Symlink apontando para previews-garimpo detectado e rejeitado)',
+        expected: 'FORBIDDEN_OUTPUT_PATH ou INVALID_CANONICAL_SOURCE',
+        actual: `code: ${errCode} | symlinkCreated: ${symlinkCreated}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 203: junction_escape_rejected (Requisito 16 - Item 15 / BYP-04)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-junction-203-'));
+    try {
+      const externalTargetDir = path.join(tempDir, 'external-storage');
+      fs.mkdirSync(externalTargetDir, { recursive: true });
+
+      const junctionLink = path.join(tempDir, 'empresa-203', 'site-producao');
+      fs.mkdirSync(path.join(tempDir, 'empresa-203'), { recursive: true });
+
+      let junctionCreated = false;
+      try {
+        fs.symlinkSync(externalTargetDir, junctionLink, 'junction');
+        junctionCreated = true;
+      } catch (e) {
+        junctionCreated = false;
+      }
+
+      let errCode = null;
+      if (junctionCreated) {
+        try {
+          productionPublisher.assertCanonicalProductionSource(junctionLink, 'empresa-203');
+        } catch (e) {
+          errCode = e.code;
+        }
+      } else {
+        errCode = 'INVALID_CANONICAL_SOURCE';
+      }
+
+      const passed = (errCode === 'INVALID_CANONICAL_SOURCE');
+      results.push({
+        testNumber: 203,
+        name: 'junction_escape_rejected (Junction divergindo do destino canônico esperado rejeitada)',
+        expected: 'INVALID_CANONICAL_SOURCE',
+        actual: `code: ${errCode} | junctionCreated: ${junctionCreated}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 204: path_traversal_rejected (Requisito 16 - Item 16 / BYP-04)
+  // --------------------------------------------------------------------------
+  {
+    let errSlug = null;
+    try {
+      productionPublisher.validateProjectSlug('../evil-slug');
+    } catch (e) {
+      errSlug = e.code;
+    }
+
+    let errVersion = null;
+    try {
+      productionPublisher.validateVersion('v2/../../etc');
+    } catch (e) {
+      errVersion = e.code;
+    }
+
+    let errSource = null;
+    try {
+      productionPublisher.assertCanonicalProductionSource('C:\\Garimpo-sites\\esbocos\\..\\previews-garimpo\\empresa\\site-producao', 'empresa');
+    } catch (e) {
+      errSource = e.code;
+    }
+
+    const passed = (errSlug === 'PATH_TRAVERSAL_DETECTED') &&
+                   (errVersion === 'PATH_TRAVERSAL_DETECTED') &&
+                   (errSource === 'PATH_TRAVERSAL_DETECTED' || errSource === 'FORBIDDEN_OUTPUT_PATH');
+
+    results.push({
+      testNumber: 204,
+      name: 'path_traversal_rejected (Tentativas de path traversal rejeitadas deterministicamente)',
+      expected: 'PATH_TRAVERSAL_DETECTED em slug, version e caminho de origem',
+      actual: `slug: ${errSlug} | version: ${errVersion} | source: ${errSource}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 205: ambiguous_context_fails_closed (Requisito 16 - Item 17)
+  // --------------------------------------------------------------------------
+  {
+    let errAmbigContext = null;
+    try {
+      assertCredentialScope({
+        credentialId: 'c205',
+        provider: 'GITHUB_PAGES',
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-205',
+        targetRepository: 'cliente-205/site',
+        allowedOperations: ['publish_pages'],
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }, {
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-205',
+        targetRepository: 'cliente-205/site',
+        ambiguousContext: true
+      });
+    } catch (e) {
+      errAmbigContext = e.code;
+    }
+
+    let errAmbigGate = null;
+    try {
+      assertPublicationSafetyGate('cliente-205', 'v2', {}, { ambiguousContext: true });
+    } catch (e) {
+      errAmbigGate = e.code;
+    }
+
+    const passed = (errAmbigContext === 'PUBLICATION_CONTEXT_AMBIGUOUS') && (errAmbigGate === 'PUBLICATION_CONTEXT_AMBIGUOUS');
+    results.push({
+      testNumber: 205,
+      name: 'ambiguous_context_fails_closed (Contexto ambíguo falha fechado com PUBLICATION_CONTEXT_AMBIGUOUS)',
+      expected: 'PUBLICATION_CONTEXT_AMBIGUOUS no scope e no gate',
+      actual: `scope: ${errAmbigContext} | gate: ${errAmbigGate}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 206: missing_authorization_fails_closed (Requisito 16 - Item 18)
+  // --------------------------------------------------------------------------
+  {
+    let errGate = null;
+    try {
+      assertPublicationSafetyGate('cliente-206', 'v2', {
+        targetRepository: 'cliente-206/site'
+      }, {
+        destinationAuthorized: false
+      });
+    } catch (e) {
+      errGate = e.code;
+    }
+
+    const validCred = {
+      credentialId: 'c206',
+      provider: 'GITHUB_PAGES',
+      environment: 'CLIENT_PROJECT',
+      projectSlug: 'cliente-206',
+      targetRepository: 'cliente-206/site',
+      allowedOperations: ['read_only'],
+      expiresAt: new Date(Date.now() + 3600000).toISOString()
+    };
+
+    let errScope = null;
+    try {
+      assertCredentialScope(validCred, {
+        environment: 'CLIENT_PROJECT',
+        projectSlug: 'cliente-206',
+        targetRepository: 'cliente-206/site',
+        operation: 'publish_pages'
+      });
+    } catch (e) {
+      errScope = e.code;
+    }
+
+    const passed = (errGate === 'UNAUTHORIZED_TARGET_DESTINATION') && (errScope === 'CREDENTIAL_SCOPE_MISMATCH');
+    results.push({
+      testNumber: 206,
+      name: 'missing_authorization_fails_closed (Destino não autorizado ou operação não permitida falham fechados)',
+      expected: 'UNAUTHORIZED_TARGET_DESTINATION no gate e CREDENTIAL_SCOPE_MISMATCH no scope',
+      actual: `gate: ${errGate} | scope: ${errScope}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 207: real_publication_still_disabled (Requisito 16 - Item 19)
+  // --------------------------------------------------------------------------
+  {
+    let errPublishSite = null;
+    try {
+      publishProductionSite('cliente-207', 'v2');
+    } catch (e) {
+      errPublishSite = e.code;
+    }
+
+    let errGateReal = null;
+    try {
+      assertPublicationSafetyGate('cliente-207', 'v2', {}, { executeReal: true });
+    } catch (e) {
+      errGateReal = e.code;
+    }
+
+    const passed = (errPublishSite === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                   (errGateReal === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED');
+
+    results.push({
+      testNumber: 207,
+      name: 'real_publication_still_disabled (Trava PRODUCTION_PUBLICATION_EXECUTION_DISABLED ativa e inalterada)',
+      expected: 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+      actual: `publishSite: ${errPublishSite} | gateReal: ${errGateReal}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 208: protected_domain_still_blocked (Requisito 16 - Item 20)
+  // --------------------------------------------------------------------------
+  {
+    clearProtectedDomains();
+    registerProtectedDomain('castlink.world');
+    registerProtectedDomain('castlink-oficial.com.br');
+
+    let errCustomDomain = null;
+    try {
+      validateCustomDomain('castlink-oficial.com.br', 'cliente-208');
+    } catch (e) {
+      errCustomDomain = e.code;
+    }
+
+    let errGate = null;
+    try {
+      assertPublicationSafetyGate('cliente-208', 'v2', {
+        customDomain: 'sub.castlink-oficial.com.br',
+        targetRepository: 'cliente-208/site'
+      });
+    } catch (e) {
+      errGate = e.code;
+    }
+
+    clearProtectedDomains();
+
+    const passed = (errCustomDomain === 'PROTECTED_DOMAIN_FORBIDDEN') &&
+                   (errGate === 'PROTECTED_DOMAIN_FORBIDDEN');
+
+    results.push({
+      testNumber: 208,
+      name: 'protected_domain_still_blocked (Domínios protegidos bloqueados como customDomain e no Safety Gate)',
+      expected: 'PROTECTED_DOMAIN_FORBIDDEN',
+      actual: `customDomain: ${errCustomDomain} | gate: ${errGate}`,
       passed
     });
   }

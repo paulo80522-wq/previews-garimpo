@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const { redactSecrets } = require('./production-publisher');
 
 const DEFAULT_CREDENTIALS_DIR = 'C:\\Users\\35tul\\.gemini\\config\\credentials\\gmail';
 const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
@@ -74,7 +75,7 @@ function exchangeCodeForTokens(clientId, clientSecret, code, redirectUri = REDIR
             reject(new Error(`Erro ao interpretar resposta de token: ${e.message}`));
           }
         } else {
-          reject(new Error(`Falha na troca de código OAuth (HTTP ${res.statusCode}): ${data}`));
+          reject(new Error(`Falha na troca de código OAuth (HTTP ${res.statusCode}): ${redactSecrets(data)}`));
         }
       });
     });

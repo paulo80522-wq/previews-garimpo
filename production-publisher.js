@@ -42,6 +42,102 @@ const ERR_FORBIDDEN_CLIENT_DOMAIN = 'FORBIDDEN_CLIENT_DOMAIN';
 const ERR_MISSING_TARGET_REPOSITORY = 'MISSING_TARGET_REPOSITORY';
 const ERR_PUBLICATION_CONTEXT_AMBIGUOUS = 'PUBLICATION_CONTEXT_AMBIGUOUS';
 
+const ERR_MISSING_PUBLICATION_CREDENTIAL = 'MISSING_PUBLICATION_CREDENTIAL';
+const ERR_INVALID_CREDENTIAL_ENVELOPE = 'INVALID_CREDENTIAL_ENVELOPE';
+const ERR_CREDENTIAL_EXPIRED = 'CREDENTIAL_EXPIRED';
+const ERR_CREDENTIAL_ENVIRONMENT_MISMATCH = 'CREDENTIAL_ENVIRONMENT_MISMATCH';
+const ERR_CREDENTIAL_SCOPE_MISMATCH = 'CREDENTIAL_SCOPE_MISMATCH';
+const ERR_CREDENTIAL_SCOPE_EXCESSIVE = 'CREDENTIAL_SCOPE_EXCESSIVE';
+
+const FORBIDDEN_ADMIN_SCOPES = [
+  'admin:org', 'admin:public_key', 'admin:repo_hook', 'admin:org_hook',
+  'admin:enterprise', 'admin:gpg_key', 'delete_repo', 'repo:delete',
+  'transfer', 'repo:admin', 'manage_users', 'owner', 'all', '*',
+  'write:packages', 'delete:packages', 'site_admin', 'security_events'
+];
+
+/**
+ * Sanitização e Redação Central de Segredos e Credenciais (Fase 8.1).
+ *
+ * Remove e ofusca deterministicamente qualquer secret, token, PAT, Bearer header,
+ * senha ou dado sensível contido em strings, objetos, arrays ou erros antes de
+ * qualquer saída em console, relatórios, diagnósticos ou serialização.
+ *
+ * Substitui valores detectados por '[REDACTED]'.
+ * Opera de forma recursiva e segura.
+ */
+function redactSecrets(value) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Se for string, aplica regras de redação de padrões sensíveis
+  if (typeof value === 'string') {
+    let sanitized = value;
+
+    // 1. GitHub PATs / Tokens (ghp_, gho_, ghu_, ghs_, ghr_, github_pat_)
+    sanitized = sanitized.replace(/(?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}/gi, '[REDACTED]');
+    sanitized = sanitized.replace(/github_pat_[a-zA-Z0-9_]{22,}/gi, '[REDACTED]');
+
+    // 2. Google OAuth / access tokens (ya29.)
+    sanitized = sanitized.replace(/ya29\.[a-zA-Z0-9_\-]+/gi, '[REDACTED]');
+
+    // 3. Authorization headers em texto (com ou sem Bearer)
+    sanitized = sanitized.replace(/(authorization:\s*['"]?)(?:Bearer\s+)?[^\s,"']+(['"]?)/gi, '$1Bearer [REDACTED]$2');
+
+    // 4. Bearer tokens avulsos em texto
+    sanitized = sanitized.replace(/(Bearer\s+)(?!\[REDACTED\])[^\s,"']+/gi, '$1[REDACTED]');
+
+    // 5. Query parameters sensíveis (token=..., secret=..., etc.)
+    sanitized = sanitized.replace(/((?:access_token|refresh_token|client_secret|api_key|secret|token|password)=)[^&\s"']+/gi, '$1[REDACTED]');
+
+    // 6. Pares chave/valor JSON serializados
+    sanitized = sanitized.replace(/"(token|access_token|refresh_token|client_secret|secret|password|authorization|private_key|pat)"\s*:\s*"[^"]*"/gi, '"$1": "[REDACTED]"');
+
+    return sanitized;
+  }
+
+  // Se for instância de Error
+  if (value instanceof Error) {
+    const redactedError = new Error(redactSecrets(value.message));
+    redactedError.name = value.name;
+    if (value.code) redactedError.code = value.code;
+    if (value.stack) {
+      redactedError.stack = redactSecrets(value.stack);
+    }
+    // Copia e sanitiza propriedades adicionais
+    for (const key of Object.keys(value)) {
+      if (!['name', 'message', 'stack'].includes(key)) {
+        redactedError[key] = redactSecrets(value[key]);
+      }
+    }
+    return redactedError;
+  }
+
+  // Se for Array
+  if (Array.isArray(value)) {
+    return value.map(item => redactSecrets(item));
+  }
+
+  // Se for Objeto comum
+  if (typeof value === 'object') {
+    const sensitiveKeyPattern = /^(token|secret|authorization|password|pat|access_token|refresh_token|client_secret|private_key|api_key|credentials|auth|auth_header)$/i;
+    const sanitizedObj = {};
+
+    for (const [key, val] of Object.entries(value)) {
+      if (sensitiveKeyPattern.test(key)) {
+        sanitizedObj[key] = '[REDACTED]';
+      } else {
+        sanitizedObj[key] = redactSecrets(val);
+      }
+    }
+    return sanitizedObj;
+  }
+
+  // Primitivos restantes (number, boolean, etc.)
+  return value;
+}
+
 const REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED = 'REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED';
 const REAL_CASTLINK_DOMAIN_STATUS = REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED;
 
@@ -141,13 +237,251 @@ function resolveEnvironmentType(projectSlug = '', targetRepo = '', options = {})
   if (cleanRepo.includes(FORBIDDEN_PATH_SUBSTRING) || cleanSlug === FORBIDDEN_PATH_SUBSTRING) {
     return ENVIRONMENT_TYPES.GARIMPO_INTERNAL;
   }
-  if (cleanSlug === 'castlink-real' || options.isCastlinkReal === true) {
+
+  // Fortalecimento de identificação de CASTLINK_REAL (BYP-03): Não depende apenas de slug === 'castlink-real'
+  const isCastlinkRealSlug = cleanSlug === 'castlink-real' ||
+                             cleanSlug === 'castlink_real' ||
+                             cleanSlug.startsWith('castlink-real') ||
+                             cleanSlug.endsWith('-castlink-real');
+
+  const isCastlinkRealRepo = cleanRepo.includes('castlink-real') ||
+                             cleanRepo.includes('castlink/real') ||
+                             cleanRepo === 'castlink/production' ||
+                             cleanRepo === 'castlink/site-oficial';
+
+  const isCastlinkRealOption = options.isCastlinkReal === true ||
+                               options.isRealCastlink === true ||
+                               options.projectType === 'CASTLINK_REAL' ||
+                               options.targetEnvironment === 'CASTLINK_REAL' ||
+                               options.environment === 'CASTLINK_REAL';
+
+  if (isCastlinkRealSlug || isCastlinkRealRepo || isCastlinkRealOption) {
     return ENVIRONMENT_TYPES.CASTLINK_REAL;
   }
+
   if (cleanSlug === 'castlink-world') {
     return ENVIRONMENT_TYPES.CASTLINK_WORLD;
   }
   return ENVIRONMENT_TYPES.CLIENT_PROJECT;
+}
+
+/**
+ * ASSERT CREDENTIAL SCOPE — Camada Defensiva de Validação e Vinculação de Credenciais (Fase 8.1)
+ *
+ * Valida rigorosamente:
+ * A. Existência da credencial (MISSING_PUBLICATION_CREDENTIAL)
+ * B. Formato/envelope obrigatório (INVALID_CREDENTIAL_ENVELOPE)
+ * C. Provedor de publicação (CREDENTIAL_SCOPE_MISMATCH)
+ * D. Ambiente de destino (CREDENTIAL_ENVIRONMENT_MISMATCH)
+ * E. ProjectSlug vinculado (CREDENTIAL_SCOPE_MISMATCH)
+ * F. TargetRepository exato sem wildcards (CREDENTIAL_SCOPE_MISMATCH)
+ * G. Operação requerida explicitamente permitida (CREDENTIAL_SCOPE_MISMATCH)
+ * H. Operações expressamente proibidas (CREDENTIAL_SCOPE_MISMATCH)
+ * I. Data de expiração válida e não expirada (CREDENTIAL_EXPIRED)
+ * J. Escopo mínimo (Least Privilege)
+ * K. Correspondência exata entre credencial e destino
+ * L. Ausência de permissões administrativas excessivas (CREDENTIAL_SCOPE_EXCESSIVE)
+ * M. Barreira intransponível de CASTLINK_REAL (PROTECTED_ENVIRONMENT_UNTOUCHABLE)
+ *
+ * @param {Object} credential Envelope de credencial (mock ou estruturado)
+ * @param {Object} publicationContext Contexto da publicação pretendida
+ * @returns {Object} Resumo sanitizado da credencial validada
+ */
+function assertCredentialScope(credential, publicationContext) {
+  // A. Existência da credencial
+  if (!credential) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Credencial de publicação ausente: ${ERR_MISSING_PUBLICATION_CREDENTIAL}`);
+    err.code = ERR_MISSING_PUBLICATION_CREDENTIAL;
+    throw err;
+  }
+
+  // B. Formato / envelope obrigatório
+  if (typeof credential !== 'object' || Array.isArray(credential)) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Envelope de credencial em formato inválido: ${ERR_INVALID_CREDENTIAL_ENVELOPE}`);
+    err.code = ERR_INVALID_CREDENTIAL_ENVELOPE;
+    throw err;
+  }
+
+  const hasRequiredFields =
+    typeof credential.credentialId === 'string' && credential.credentialId.trim().length > 0 &&
+    typeof credential.provider === 'string' && credential.provider.trim().length > 0 &&
+    typeof credential.environment === 'string' && credential.environment.trim().length > 0 &&
+    typeof credential.projectSlug === 'string' && credential.projectSlug.trim().length > 0 &&
+    typeof credential.targetRepository === 'string' && credential.targetRepository.trim().length > 0 &&
+    Array.isArray(credential.allowedOperations) && credential.allowedOperations.length > 0 &&
+    Boolean(credential.expiresAt);
+
+  if (!hasRequiredFields) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Envelope de credencial incompleto ou campos ausentes: ${ERR_INVALID_CREDENTIAL_ENVELOPE}`);
+    err.code = ERR_INVALID_CREDENTIAL_ENVELOPE;
+    throw err;
+  }
+
+  // Validação do contexto de publicação
+  if (!publicationContext || typeof publicationContext !== 'object') {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Contexto de publicação ausente ou inválido: ${ERR_PUBLICATION_CONTEXT_AMBIGUOUS}`);
+    err.code = ERR_PUBLICATION_CONTEXT_AMBIGUOUS;
+    throw err;
+  }
+
+  if (publicationContext.ambiguousContext === true || publicationContext.contextAmbiguous === true) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Contexto de publicação ambíguo: ${ERR_PUBLICATION_CONTEXT_AMBIGUOUS}`);
+    err.code = ERR_PUBLICATION_CONTEXT_AMBIGUOUS;
+    throw err;
+  }
+
+  if (!publicationContext.projectSlug || !publicationContext.environment) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Contexto de publicação incompleto: ${ERR_PUBLICATION_CONTEXT_AMBIGUOUS}`);
+    err.code = ERR_PUBLICATION_CONTEXT_AMBIGUOUS;
+    throw err;
+  }
+
+  // M. CASTLINK_REAL é absolutamente intocável e nunca recebe credenciais
+  if (
+    publicationContext.environment === ENVIRONMENT_TYPES.CASTLINK_REAL ||
+    credential.environment === ENVIRONMENT_TYPES.CASTLINK_REAL ||
+    publicationContext.projectSlug === 'castlink-real' ||
+    credential.projectSlug === 'castlink-real' ||
+    publicationContext.isCastlinkReal === true
+  ) {
+    const err = new Error(`[VIOLAÇÃO DE AMBIENTE PROTEGIDO] O ambiente '${ENVIRONMENT_TYPES.CASTLINK_REAL}' é a produção real intocável do CastLink. Credenciais são terminantemente proibidas: ${ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE}`);
+    err.code = ERR_PROTECTED_ENVIRONMENT_UNTOUCHABLE;
+    err.environment = ENVIRONMENT_TYPES.CASTLINK_REAL;
+    throw err;
+  }
+
+  // I. Expiração da credencial
+  const expiresTimestamp = new Date(credential.expiresAt).getTime();
+  if (isNaN(expiresTimestamp)) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Data de expiração da credencial inválida: ${ERR_INVALID_CREDENTIAL_ENVELOPE}`);
+    err.code = ERR_INVALID_CREDENTIAL_ENVELOPE;
+    throw err;
+  }
+
+  const currentTime = publicationContext.now ? new Date(publicationContext.now).getTime() : Date.now();
+  if (expiresTimestamp <= currentTime) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Credencial expirada em ${new Date(expiresTimestamp).toISOString()}: ${ERR_CREDENTIAL_EXPIRED}`);
+    err.code = ERR_CREDENTIAL_EXPIRED;
+    err.expiresAt = credential.expiresAt;
+    throw err;
+  }
+
+  // D. Correspondência estrita de ambiente
+  if (credential.environment !== publicationContext.environment) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Divergência de ambiente ('${credential.environment}' vs '${publicationContext.environment}'): ${ERR_CREDENTIAL_ENVIRONMENT_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_ENVIRONMENT_MISMATCH;
+    err.credentialEnvironment = credential.environment;
+    err.contextEnvironment = publicationContext.environment;
+    throw err;
+  }
+
+  // C. Correspondência de provedor
+  const expectedProvider = (publicationContext.provider || 'GITHUB_PAGES').toUpperCase();
+  if (credential.provider.toUpperCase() !== expectedProvider) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Provedor incompatível ('${credential.provider}' vs '${expectedProvider}'): ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    throw err;
+  }
+
+  // E. Correspondência estrita de projectSlug
+  const credSlug = credential.projectSlug.trim().toLowerCase();
+  const ctxSlug = publicationContext.projectSlug.trim().toLowerCase();
+  if (credSlug !== ctxSlug) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Escopo de projeto incompatível ('${credential.projectSlug}' vs '${publicationContext.projectSlug}'): ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    throw err;
+  }
+
+  // F. Correspondência estrita de targetRepository (sem wildcards, sem correspondência parcial)
+  const credRepo = credential.targetRepository.trim().toLowerCase();
+  const ctxRepo = (publicationContext.targetRepository || '').trim().toLowerCase();
+
+  if (credRepo.includes('*') || credRepo.includes('?') || !credRepo.includes('/')) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] targetRepository da credencial inválido ou contém wildcard ('${credential.targetRepository}'): ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    throw err;
+  }
+
+  if (credRepo !== ctxRepo) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Escopo de repositório incompatível ('${credential.targetRepository}' vs '${publicationContext.targetRepository}'): ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    throw err;
+  }
+
+  // G & H. Validação de operações permitidas e proibidas
+  const requestedOp = (publicationContext.operation || 'publish_pages').trim();
+  if (!credential.allowedOperations.includes(requestedOp)) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Operação '${requestedOp}' não autorizada na credencial: ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    err.requestedOperation = requestedOp;
+    throw err;
+  }
+
+  if (Array.isArray(credential.forbiddenOperations) && credential.forbiddenOperations.includes(requestedOp)) {
+    const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Operação '${requestedOp}' expressamente proibida na credencial: ${ERR_CREDENTIAL_SCOPE_MISMATCH}`);
+    err.code = ERR_CREDENTIAL_SCOPE_MISMATCH;
+    throw err;
+  }
+
+  // L. Ausência de permissões administrativas excessivas (Least Privilege)
+  const allCandidateScopes = [
+    ...credential.allowedOperations,
+    ...(Array.isArray(credential.scopes) ? credential.scopes : []),
+    ...(Array.isArray(credential.permissions) ? credential.permissions : [])
+  ].map(s => String(s).trim().toLowerCase());
+
+  for (const scope of allCandidateScopes) {
+    if (FORBIDDEN_ADMIN_SCOPES.some(forbidden => scope === forbidden || scope.startsWith(forbidden + ':') || scope.endsWith(':' + forbidden))) {
+      const err = new Error(`[SEGURANÇA DE CREDENCIAIS] Escopo excessivo detectado ('${scope}'). Permissões administrativas violam Least Privilege: ${ERR_CREDENTIAL_SCOPE_EXCESSIVE}`);
+      err.code = ERR_CREDENTIAL_SCOPE_EXCESSIVE;
+      err.excessiveScope = scope;
+      throw err;
+    }
+  }
+
+  // Restrições adicionais por ambiente
+  // CASTLINK_WORLD (Laboratório)
+  if (publicationContext.environment === ENVIRONMENT_TYPES.CASTLINK_WORLD) {
+    if (publicationContext.customDomain || publicationContext.cnameRequired) {
+      const err = new Error("[ISOLAMENTO DO LABORATÓRIO] castlink-world nunca pode receber customDomain ou CNAME: LAB_CUSTOM_DOMAIN_FORBIDDEN");
+      err.code = 'LAB_CUSTOM_DOMAIN_FORBIDDEN';
+      throw err;
+    }
+  }
+
+  // CLIENT_PROJECT
+  if (publicationContext.environment === ENVIRONMENT_TYPES.CLIENT_PROJECT) {
+    if (!publicationContext.targetRepository) {
+      const err = new Error(`[REPOSITÓRIO AUSENTE] CLIENT_PROJECT exige targetRepository: ${ERR_MISSING_TARGET_REPOSITORY}`);
+      err.code = ERR_MISSING_TARGET_REPOSITORY;
+      throw err;
+    }
+    if (ctxRepo.includes(FORBIDDEN_PATH_SUBSTRING)) {
+      const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO] CLIENT_PROJECT não pode usar previews-garimpo: '${ctxRepo}'`);
+      err.code = 'FORBIDDEN_TARGET_REPOSITORY';
+      throw err;
+    }
+    if (ctxRepo.includes('castlink-world')) {
+      const err = new Error(`[VIOLAÇÃO DE ISOLAMENTO] CLIENT_PROJECT não pode usar infraestrutura do laboratório: '${ctxRepo}'`);
+      err.code = ERR_FORBIDDEN_LAB_INFRASTRUCTURE;
+      throw err;
+    }
+    if (publicationContext.customDomain) {
+      assertDomainNotProtected(publicationContext.customDomain, publicationContext.projectSlug);
+    }
+  }
+
+  return {
+    valid: true,
+    credentialId: credential.credentialId,
+    provider: credential.provider,
+    environment: credential.environment,
+    projectSlug: credential.projectSlug,
+    targetRepository: credential.targetRepository,
+    allowedOperations: [...credential.allowedOperations],
+    expiresAt: credential.expiresAt,
+    sanitized: true
+  };
 }
 
 
@@ -415,6 +749,13 @@ function assertCanonicalProductionSource(sourceDir, projectSlug) {
     throw err;
   }
 
+  // Prevenção direta contra path traversal na string
+  if (sourceDir.includes('..')) {
+    const err = new Error(`[PATH TRAVERSAL DETECTADO] Caminho de origem contém tentativa de path traversal ('..'): ${sourceDir}`);
+    err.code = 'PATH_TRAVERSAL_DETECTED';
+    throw err;
+  }
+
   const normalized = path.resolve(sourceDir);
   const lower = normalized.toLowerCase();
 
@@ -439,6 +780,35 @@ function assertCanonicalProductionSource(sourceDir, projectSlug) {
     err.code = 'PRODUCTION_SITE_DIR_NOT_FOUND';
     err.sourceDir = normalized;
     throw err;
+  }
+
+  // BARREIRA 4 (BYP-04): Resolução física segura contra Symlinks e Junctions
+  try {
+    const physicalPath = fs.realpathSync(normalized);
+    const physicalLower = physicalPath.toLowerCase();
+
+    // Se o caminho físico resolvido apontar para previews-garimpo
+    if (physicalLower.includes(FORBIDDEN_PATH_SUBSTRING)) {
+      const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Caminho físico aponta para dentro de previews-garimpo: ${physicalPath}`);
+      err.code = 'FORBIDDEN_OUTPUT_PATH';
+      err.physicalPath = physicalPath;
+      throw err;
+    }
+
+    // Se o caminho físico não terminar com o sufixo esperado
+    if (!physicalLower.endsWith(expectedSuffix)) {
+      const err = new Error(`[ESCAPE DE SYMLINK/JUNCTION] Caminho físico diverge do destino canônico esperado: ${physicalPath}`);
+      err.code = 'INVALID_CANONICAL_SOURCE';
+      err.physicalPath = physicalPath;
+      throw err;
+    }
+  } catch (err) {
+    if (err.code === 'FORBIDDEN_OUTPUT_PATH' || err.code === 'INVALID_CANONICAL_SOURCE') {
+      throw err;
+    }
+    const wrapErr = new Error(`[FALHA NA RESOLUÇÃO FÍSICA]: ${err.message}`);
+    wrapErr.code = 'PHYSICAL_PATH_RESOLUTION_FAILED';
+    throw wrapErr;
   }
 
   return true;
@@ -740,6 +1110,14 @@ function assertPublicationSafetyGate(projectSlug, version, targetConfig = {}, op
     throw err;
   }
 
+  // BYP-01: A flag --production-send destina-se EXCLUSIVAMENTE ao envio de e-mails comerciais (Fase 1)
+  // Ela nunca autoriza nem executa publicação de sites.
+  if (options.productionSend === true && options.dryRun === false) {
+    const err = new Error(`[SAFETY GATE] A flag --production-send é exclusiva para envio de e-mails comerciais e não autoriza publicação de sites: ${ERR_PRODUCTION_EXECUTION_DISABLED}`);
+    err.code = ERR_PRODUCTION_EXECUTION_DISABLED;
+    throw err;
+  }
+
   // 2. DETECÇÃO DE OPERAÇÃO AMBÍGUA (PUBLICATION_CONTEXT_AMBIGUOUS)
   // A) Flags explícitas de ambiguidade de contexto ou ownership
   if (options.ambiguousContext === true || options.contextAmbiguous === true || options.ownershipAmbiguous === true) {
@@ -895,13 +1273,37 @@ function assertPublicationSafetyGate(projectSlug, version, targetConfig = {}, op
     }
   }
 
+  // 7. VALIDAÇÃO DEFENSIVA DE ESCOPO DE CREDENCIAIS (FASE 8.1)
+  const credCandidate = options.credential || target.credential || null;
+  if (options.requireCredential === true && !credCandidate) {
+    const err = new Error(`[SAFETY GATE] Credencial de publicação exigida mas ausente: ${ERR_MISSING_PUBLICATION_CREDENTIAL}`);
+    err.code = ERR_MISSING_PUBLICATION_CREDENTIAL;
+    throw err;
+  }
+
+  let validatedCredentialScope = null;
+  if (credCandidate) {
+    const pubCtx = {
+      environment: envType,
+      projectSlug: cleanSlug,
+      targetRepository: target.targetRepository,
+      provider: target.provider || 'GITHUB_PAGES',
+      operation: options.operation || 'publish_pages',
+      customDomain,
+      cnameRequired: Boolean(target.cnameRequired || options.cnameRequired),
+      now: options.now || options.currentTime
+    };
+    validatedCredentialScope = assertCredentialScope(credCandidate, pubCtx);
+  }
+
   return {
     passed: true,
     safe: true,
     environment: envType,
     projectSlug: cleanSlug,
     dryRun: true,
-    executionAllowed: false
+    executionAllowed: false,
+    credentialScope: validatedCredentialScope
   };
 }
 
@@ -1050,7 +1452,7 @@ function publishProductionSite(projectSlug, version, options = {}) {
  */
 function executeControlledPublication(projectSlug, version, options = {}) {
   // BARREIRA SOBERANA: Validação prévia irrestrita pelo Publication Safety Gate
-  assertPublicationSafetyGate(projectSlug, version, options.publicationTarget, options);
+  const safetyGate = assertPublicationSafetyGate(projectSlug, version, options.publicationTarget, options);
 
   // 1. Validação do Ambiente
   const envType = resolveEnvironmentType(projectSlug, options.publicationTarget?.targetRepository, options);
@@ -1134,8 +1536,8 @@ function executeControlledPublication(projectSlug, version, options = {}) {
       publicationTarget: targetNormalized
     });
 
-    // 10. Apresentação e Registro do que seria publicado
-    const simulationReport = {
+    // 10. Apresentação e Registro do que seria publicado (com redação estrita de segredos)
+    const rawSimulationReport = {
       executorVersion: '1.0.0',
       timestamp: new Date().toISOString(),
       environment: envType,
@@ -1152,6 +1554,18 @@ function executeControlledPublication(projectSlug, version, options = {}) {
         branch: plan.targetConfig.targetBranch || 'main',
         customDomain: plan.targetConfig.customDomain || null,
         cnameArtifactPlanned: plan.targetConfig.cnameRequired && Boolean(plan.targetConfig.customDomain)
+      },
+      credentialScopeVerification: safetyGate.credentialScope ? {
+        verified: true,
+        credentialId: safetyGate.credentialScope.credentialId,
+        provider: safetyGate.credentialScope.provider,
+        environment: safetyGate.credentialScope.environment,
+        projectSlug: safetyGate.credentialScope.projectSlug,
+        targetRepository: safetyGate.credentialScope.targetRepository,
+        allowedOperations: safetyGate.credentialScope.allowedOperations
+      } : {
+        verified: false,
+        status: 'NO_CREDENTIAL_SUPPLIED_IN_DRY_RUN'
       },
       artifactVerification: {
         totalFiles: plan.totalFiles,
@@ -1174,6 +1588,8 @@ function executeControlledPublication(projectSlug, version, options = {}) {
       remotePublicationExecuted: false,
       status: 'SIMULATED_SUCCESSFULLY'
     };
+
+    const simulationReport = redactSecrets(rawSimulationReport);
 
     // 11. Bloqueio de Publicação Remota Real (sempre ativo)
     return {
@@ -1203,6 +1619,15 @@ module.exports = {
   ERR_FORBIDDEN_CLIENT_DOMAIN,
   ERR_MISSING_TARGET_REPOSITORY,
   ERR_PUBLICATION_CONTEXT_AMBIGUOUS,
+  ERR_MISSING_PUBLICATION_CREDENTIAL,
+  ERR_INVALID_CREDENTIAL_ENVELOPE,
+  ERR_CREDENTIAL_EXPIRED,
+  ERR_CREDENTIAL_ENVIRONMENT_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_MISMATCH,
+  ERR_CREDENTIAL_SCOPE_EXCESSIVE,
+  FORBIDDEN_ADMIN_SCOPES,
+  redactSecrets,
+  assertCredentialScope,
   REAL_CASTLINK_DOMAIN_NOT_IDENTIFIED,
   REAL_CASTLINK_DOMAIN_STATUS,
   getRealCastLinkDomainStatus,
