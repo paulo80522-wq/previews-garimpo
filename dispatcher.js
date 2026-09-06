@@ -37,6 +37,7 @@ const {
   resolveCanonicalDestination,
   assertValidCanonicalDestination
 } = require('./site-builder');
+const productionPublisher = require('./production-publisher');
 
 const OFFICIAL_SENDER = 'paulonunes.consultoriadigital@gmail.com';
 const REQUIRED_APPROVER = 'Paulo Nunes';
@@ -2408,12 +2409,18 @@ function generateApprovalPanel(projectSlug, version, options = {}) {
     `  - Site Homologation: \`${homologation.decision}\``,
     `  - Publication Approval: \`${pubApproval.decision}\``,
     `- **Situação do Gate:** ${publicationGateSituation}`,
+    `- **Plano de Publicação (Fase 5):** ${pubApproval.decision === 'APPROVED' ? '🟢 PLANO DISPONÍVEL (DRY-RUN)' : '⚪ PENDENTE DE AUTORIZAÇÃO FORMAL'}`,
+    `- **Modo de Operação:** \`DRY-RUN (Simulação estrita sem envio remoto)\``,
+    `- **Execução Real:** \`DESABILITADA (Bloqueio estrito da Fase 5)\``,
+    `- **Destino de Produção:** \`PENDING_CONFIGURATION\``,
     ``,
     `> [!NOTE]`,
-    `> **COMANDOS DE AUTORIZAÇÃO DE PUBLICAÇÃO:**`,
+    `> **COMANDOS DE AUTORIZAÇÃO E PLANEJAMENTO DE PUBLICAÇÃO:**`,
     `> - Para autorizar a publicação: \`node dispatcher.js ${projectSlug} ${targetVersion} --approve-publication\``,
     `> - Para rejeitar a publicação: \`node dispatcher.js ${projectSlug} ${targetVersion} --reject-publication\``,
-    `> - Para consultar status: \`node dispatcher.js ${projectSlug} ${targetVersion} --publication-status\``,
+    `> - Para consultar status da autorização: \`node dispatcher.js ${projectSlug} ${targetVersion} --publication-status\``,
+    `> - Para gerar plano determinístico (DRY-RUN): \`node dispatcher.js ${projectSlug} ${targetVersion} --production-publication-plan\``,
+    `> - Para consultar status da publicação de produção: \`node dispatcher.js ${projectSlug} ${targetVersion} --production-publication-status\``,
     ``,
     `---`,
     `### COMANDO PARA AUTORIZAR DISPARO REAL (SOMENTE APÓS DELIBERAÇÃO HUMANA)`,
@@ -2884,6 +2891,91 @@ if (require.main === module) {
     process.exit(0);
   }
 
+  // Geração do Plano Determinístico de Publicação de Produção (Fase 5 - DRY-RUN)
+  if (args.includes('--production-publication-plan')) {
+    try {
+      const plan = productionPublisher.buildProductionPublicationPlan(slug, version, { assertPublicationApproved });
+      console.log(`\n====================================================`);
+      console.log(` PLANO DETERMINÍSTICO DE PUBLICAÇÃO DE PRODUÇÃO (DRY-RUN)`);
+      console.log(`====================================================`);
+      console.log(`Projeto:              ${plan.projectSlug}`);
+      console.log(`Versão:               ${plan.version}`);
+      console.log(`Diretório de Origem:  ${plan.sourceDirectory}`);
+      console.log(`Destino Pretendido:   ${plan.publicationTarget}`);
+      console.log(`Destino Configurado:  ${plan.targetConfigured ? 'SIM' : 'NÃO (PENDENTE DE CONFIGURAÇÃO)'}`);
+      console.log(`Modo de Operação:     ${plan.mode} (Sem envio remoto)`);
+      console.log(`Data do Planejamento: ${plan.plannedAt}`);
+      console.log(`Autorização:          🟢 APROVADA por ${plan.authorizationState.decisionBy} em ${plan.authorizationState.decisionAt}`);
+      console.log(`Total de Arquivos:    ${plan.totalFiles} (${plan.totalSizeBytes} bytes)`);
+      console.log(`Checksum Agregado:    ${plan.aggregateSha256}`);
+      console.log(`\nArquivos Inspecionados:`);
+      for (const file of plan.expectedFiles) {
+        console.log(`  - ${file.relativePath.padEnd(20)} [${file.size.toString().padStart(6)} bytes] SHA-256: ${file.sha256}`);
+      }
+      console.log(`\nSituação da Execução: 🔒 BLOQUEADA`);
+      console.log(`Motivo do Bloqueio:   ${plan.executionBlockReason}`);
+      console.log(`Aviso de Segurança:   Publicação real desabilitada nesta fase. Nenhum arquivo foi transmitido.\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`\n[ERRO NO PLANO DE PUBLICAÇÃO]: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Consulta do Status de Publicação de Produção (Fase 5 - Somente Leitura)
+  if (args.includes('--production-publication-status')) {
+    const pub = getPublicationApproval(slug);
+    const bApp = getBuildApproval(slug);
+    const bVal = getBuildValidation(slug);
+    const sHomo = getHomologation(slug);
+
+    let buildExecStatus = 'N/A';
+    const defaultGarimpoDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos';
+    const baseDir = fs.existsSync(defaultGarimpoDir) ? defaultGarimpoDir : path.join(__dirname, '..', 'esbocos');
+    const manifestPath = path.join(baseDir, slug, 'manifest.json');
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const m = readJsonSafely(manifestPath);
+        buildExecStatus = m.buildExecution?.status || 'N/A';
+      } catch (e) {
+        buildExecStatus = 'ERRO_LEITURA';
+      }
+    }
+
+    let planStatus = '⚪ PLANO INDISPONÍVEL';
+    let fileSummary = 'N/A';
+    let gateSituation = '🔴 PUBLICAÇÃO BLOQUEADA';
+    try {
+      assertPublicationApproved(slug, version);
+      gateSituation = '🟢 AUTORIZADA';
+      const plan = productionPublisher.buildProductionPublicationPlan(slug, version, { assertPublicationApproved });
+      planStatus = '🟢 PLANO GERADO COM SUCESSO (DRY-RUN)';
+      fileSummary = `${plan.totalFiles} arquivos (${plan.totalSizeBytes} bytes) | Checksum: ${plan.aggregateSha256.substring(0, 16)}...`;
+    } catch (err) {
+      gateSituation = `🔴 BLOQUEADA (${err.code || 'ERRO'})`;
+      planStatus = `🔴 NÃO DISPONÍVEL: ${err.message}`;
+    }
+
+    console.log(`\n====================================================`);
+    console.log(` STATUS DA PUBLICAÇÃO DE PRODUÇÃO (SOMENTE LEITURA)`);
+    console.log(`====================================================`);
+    console.log(`Projeto:              ${slug}`);
+    console.log(`Versão:               ${version}`);
+    console.log(`Modo Atual:           DRY-RUN (Simulação estrita sem rede)`);
+    console.log(`Publicação Real:      DESABILITADA (Fase 5)`);
+    console.log(`Destino de Produção:  PENDING_CONFIGURATION`);
+    console.log(`Cadeia de Governança:`);
+    console.log(`  - Build Approval:       ${bApp.decision}`);
+    console.log(`  - Build Execution:      ${buildExecStatus}`);
+    console.log(`  - Build Validation:     ${bVal?.status || 'Pendente'}`);
+    console.log(`  - Site Homologation:    ${sHomo.decision}`);
+    console.log(`  - Publication Approval: ${pub.decision}`);
+    console.log(`Situação do Gate:     ${gateSituation}`);
+    console.log(`Plano de Publicação:  ${planStatus}`);
+    console.log(`Integridade do Site:  ${fileSummary}\n`);
+    process.exit(0);
+  }
+
   executeDispatcher(slug, version, {
     productionSend: isProduction,
     dryRun: !isProduction
@@ -2950,5 +3042,12 @@ module.exports = {
   assertPublicationApproved,
   executeBuildSite,
   executeApprovedBuild: executeBuildSite,
-  buildSite: executeBuildSite
+  buildSite: executeBuildSite,
+  validateProductionPublicationRequest: productionPublisher.validateProductionPublicationRequest,
+  buildProductionPublicationPlan: productionPublisher.buildProductionPublicationPlan,
+  assertProductionPublicationReady: productionPublisher.assertProductionPublicationReady,
+  publishProductionSite: productionPublisher.publishProductionSite,
+  calculateArtifactIntegrity: productionPublisher.calculateArtifactIntegrity,
+  ERR_PRODUCTION_EXECUTION_DISABLED: productionPublisher.ERR_PRODUCTION_EXECUTION_DISABLED,
+  PUBLICATION_TARGET_PENDING: productionPublisher.PUBLICATION_TARGET_PENDING
 };

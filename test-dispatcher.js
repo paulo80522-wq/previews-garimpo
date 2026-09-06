@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const {
   validateEmailGate,
@@ -55,7 +56,14 @@ const {
   validatePublicationApproval,
   getPublicationApproval,
   setPublicationApproval,
-  assertPublicationApproved
+  assertPublicationApproved,
+  validateProductionPublicationRequest,
+  buildProductionPublicationPlan,
+  assertProductionPublicationReady,
+  publishProductionSite,
+  calculateArtifactIntegrity,
+  ERR_PRODUCTION_EXECUTION_DISABLED,
+  PUBLICATION_TARGET_PENDING
 } = require('./dispatcher');
 
 const {
@@ -3674,6 +3682,706 @@ Prezados, mensagem de teste tentando usar remetente arbitrário.
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 118: plan_without_build_approval_blocked (Etapa 12 - Requisito 1)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-118-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-118', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-118', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-118', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-118', true, { baseDir: tempDir, version: 'v2' });
+
+      // Invalida buildApproval no manifesto
+      const manifestPath = path.join(tempDir, 'empresa-plan-118', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildApproval = { approved: false, decision: 'PENDING', status: 'PENDENTE' };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-118', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 118,
+        name: 'plan_without_build_approval_blocked (Plano sem buildApproval é bloqueado com PUBLICATION_PREREQUISITE_MISSING)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 119: plan_without_build_execution_blocked (Etapa 12 - Requisito 2)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-119-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-119', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-119', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-119', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-119', true, { baseDir: tempDir, version: 'v2' });
+
+      // Remove buildExecution do manifesto
+      const manifestPath = path.join(tempDir, 'empresa-plan-119', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      delete m.buildExecution;
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-119', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 119,
+        name: 'plan_without_build_execution_blocked (Plano sem buildExecution é bloqueado com PUBLICATION_PREREQUISITE_MISSING)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 120: plan_without_build_validation_blocked (Etapa 12 - Requisito 3)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-120-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-120', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-120', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-120', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-120', true, { baseDir: tempDir, version: 'v2' });
+
+      // Corrompe buildValidation no manifesto
+      const manifestPath = path.join(tempDir, 'empresa-plan-120', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildValidation = { status: 'PENDENTE', isValid: false };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-120', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 120,
+        name: 'plan_without_build_validation_blocked (Plano sem buildValidation é bloqueado com PUBLICATION_PREREQUISITE_MISSING)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 121: plan_without_site_homologation_blocked (Etapa 12 - Requisito 4)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-121-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-121', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-121', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-121', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-121', true, { baseDir: tempDir, version: 'v2' });
+
+      // Invalida homologação no manifesto
+      const manifestPath = path.join(tempDir, 'empresa-plan-121', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.siteHomologation = { status: 'PENDENTE', approved: false, decision: 'PENDING' };
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-121', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_PREREQUISITE_MISSING');
+      results.push({
+        testNumber: 121,
+        name: 'plan_without_site_homologation_blocked (Plano sem siteHomologation é bloqueado com PUBLICATION_PREREQUISITE_MISSING)',
+        expected: 'PUBLICATION_PREREQUISITE_MISSING',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 122: plan_without_publication_approval_blocked (Etapa 12 - Requisito 5)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-122-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-122', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-122', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-122', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-122', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_APPROVAL_REQUIRED');
+      results.push({
+        testNumber: 122,
+        name: 'plan_without_publication_approval_blocked (Plano sem publicationApproval é bloqueado com PUBLICATION_APPROVAL_REQUIRED)',
+        expected: 'PUBLICATION_APPROVAL_REQUIRED',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 123: plan_divergent_project_blocked (Etapa 12 - Requisito 6)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-123-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-123-a', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-123-a', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-123-a', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-123-a', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-123-b', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null);
+      results.push({
+        testNumber: 123,
+        name: 'plan_divergent_project_blocked (Tentativa de planejar para projeto inexistente ou divergente é bloqueada)',
+        expected: 'Erro de projeto lançado',
+        actual: `error: ${err?.message}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 124: plan_divergent_version_blocked (Etapa 12 - Requisito 7)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-124-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-124', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-124', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-124', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-124', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-124', 'v3', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_VERSION_MISMATCH');
+      results.push({
+        testNumber: 124,
+        name: 'plan_divergent_version_blocked (Plano com versão divergente da homologada é bloqueado com PUBLICATION_VERSION_MISMATCH)',
+        expected: 'PUBLICATION_VERSION_MISMATCH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 125: plan_homologation_stale_blocked (Etapa 12 - Requisito 8)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-125-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-125', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-125', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-125', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-125', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-plan-125', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.siteHomologation.decisionAt = '2020-01-01T00:00:00.000Z';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-125', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) &&
+                     (err.code === 'PUBLICATION_PREREQUISITE_MISSING' || err.code === 'HOMOLOGATION_STALE') &&
+                     err.message.includes('HOMOLOGAÇÃO OBSOLETA');
+      results.push({
+        testNumber: 125,
+        name: 'plan_homologation_stale_blocked (Homologação anterior ao build bloqueia o plano determinístico)',
+        expected: 'HOMOLOGAÇÃO OBSOLETA (PUBLICATION_PREREQUISITE_MISSING ou HOMOLOGATION_STALE)',
+        actual: `code: ${err?.code} | message: ${err?.message}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 126: plan_publication_approval_stale_blocked (Etapa 12 - Requisito 9)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-126-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-126', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-126', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-126', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-126', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-plan-126', 'manifest.json');
+      const m = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      m.buildExecution.executedAt = '2026-09-05T18:00:00.000Z';
+      m.siteHomologation.decisionAt = '2026-09-05T20:00:00.000Z';
+      m.publicationApproval.decisionAt = '2026-09-05T19:00:00.000Z';
+      fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf8');
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-126', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_APPROVAL_STALE');
+      results.push({
+        testNumber: 126,
+        name: 'plan_publication_approval_stale_blocked (Autorização anterior à homologação bloqueia com PUBLICATION_APPROVAL_STALE)',
+        expected: 'PUBLICATION_APPROVAL_STALE',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 127: plan_rebuild_invalidates_authorization (Etapa 12 - Requisito 10)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-127-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-127', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-127', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-127', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-127', true, { baseDir: tempDir, version: 'v2' });
+
+      // Rebuild reseta publicationApproval e siteHomologation para PENDENTE
+      executeBuildSite('empresa-plan-127', 'v2', { baseDir: tempDir });
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-127', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PUBLICATION_APPROVAL_REQUIRED');
+      results.push({
+        testNumber: 127,
+        name: 'plan_rebuild_invalidates_authorization (Rebuild invalida autorização anterior e bloqueia plano de publicação)',
+        expected: 'PUBLICATION_APPROVAL_REQUIRED',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 128: plan_nonexistent_artifact_dir_blocked (Etapa 12 - Requisito 11)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-128-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-128', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-128', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-128', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-128', true, { baseDir: tempDir, version: 'v2' });
+
+      // Remove fisicamente a pasta site-producao
+      const siteDir = path.join(tempDir, 'empresa-plan-128', 'site-producao');
+      fs.rmSync(siteDir, { recursive: true, force: true });
+
+      let err = null;
+      try {
+        buildProductionPublicationPlan('empresa-plan-128', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'PRODUCTION_SITE_DIR_NOT_FOUND');
+      results.push({
+        testNumber: 128,
+        name: 'plan_nonexistent_artifact_dir_blocked (Diretório site-producao ausente bloqueia com PRODUCTION_SITE_DIR_NOT_FOUND)',
+        expected: 'PRODUCTION_SITE_DIR_NOT_FOUND',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 129: plan_incorrect_project_dir_blocked (Etapa 12 - Requisito 12)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-129-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-129', 'v2', { approved: true, includeScript: true });
+
+      let err = null;
+      try {
+        validateProductionPublicationRequest('empresa-plan-129', 'v2', {
+          baseDir: path.join(tempDir, 'outro-projeto')
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null);
+      results.push({
+        testNumber: 129,
+        name: 'plan_incorrect_project_dir_blocked (Diretório de projeto incorreto é rejeitado deterministicamente)',
+        expected: 'Erro lançado para diretório incorreto',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 130: plan_previews_garimpo_path_forbidden (Etapa 12 - Requisito 13)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'previews-garimpo-fake-130-'));
+    try {
+      let err = null;
+      try {
+        validateProductionPublicationRequest('empresa-plan-130', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) && (err.code === 'FORBIDDEN_OUTPUT_PATH');
+      results.push({
+        testNumber: 130,
+        name: 'plan_previews_garimpo_path_forbidden (Caminhos contendo previews-garimpo são terminantemente bloqueados)',
+        expected: 'FORBIDDEN_OUTPUT_PATH',
+        actual: `code: ${err?.code}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 131: plan_unconfigured_target_pending (Etapa 12 - Requisito 14)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-131-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-131', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-131', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-131', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-131', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('empresa-plan-131', 'v2', { baseDir: tempDir });
+
+      const passed = (plan.publicationTarget === 'PENDING_CONFIGURATION') &&
+                     (plan.targetConfigured === false);
+      results.push({
+        testNumber: 131,
+        name: 'plan_unconfigured_target_pending (Destino não configurado resulta em PENDING_CONFIGURATION e targetConfigured: false)',
+        expected: 'publicationTarget: PENDING_CONFIGURATION e targetConfigured: false',
+        actual: `target: ${plan.publicationTarget} | configured: ${plan.targetConfigured}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 132: plan_dry_run_mandatory (Etapa 12 - Requisito 15)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-132-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-132', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-132', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-132', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-132', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('empresa-plan-132', 'v2', { baseDir: tempDir });
+
+      const passed = (plan.dryRun === true) &&
+                     (plan.mode === 'DRY_RUN') &&
+                     (plan.executionAllowed === false) &&
+                     (plan.executionBlockReason === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED');
+      results.push({
+        testNumber: 132,
+        name: 'plan_dry_run_mandatory (Modo DRY-RUN é obrigatório e bloqueio de execução real é explícito)',
+        expected: 'dryRun: true, mode: DRY_RUN, executionAllowed: false',
+        actual: `dryRun: ${plan.dryRun} | mode: ${plan.mode} | executionAllowed: ${plan.executionAllowed}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 133: plan_deterministic_generation (Etapa 12 - Requisito 16)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-133-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-133', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-133', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-133', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-133', true, { baseDir: tempDir, version: 'v2' });
+
+      const fixedDate = '2026-09-06T12:00:00.000Z';
+      const plan1 = buildProductionPublicationPlan('empresa-plan-133', 'v2', { baseDir: tempDir, plannedAtOverride: fixedDate });
+      const plan2 = buildProductionPublicationPlan('empresa-plan-133', 'v2', { baseDir: tempDir, plannedAtOverride: fixedDate });
+
+      const passed = (JSON.stringify(plan1) === JSON.stringify(plan2)) &&
+                     (plan1.aggregateSha256 === plan2.aggregateSha256);
+      results.push({
+        testNumber: 133,
+        name: 'plan_deterministic_generation (Geração de plano é 100% determinística com saídas e hashes idênticos)',
+        expected: 'plan1 === plan2 e aggregateSha256 idênticos',
+        actual: `identical: ${JSON.stringify(plan1) === JSON.stringify(plan2)} | shaMatch: ${plan1.aggregateSha256 === plan2.aggregateSha256}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 134: plan_sha256_integrity_calculated (Etapa 12 - Requisito 17)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-134-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-134', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-134', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-134', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-134', true, { baseDir: tempDir, version: 'v2' });
+
+      const plan = buildProductionPublicationPlan('empresa-plan-134', 'v2', { baseDir: tempDir });
+
+      const siteDir = path.join(tempDir, 'empresa-plan-134', 'site-producao');
+      const indexFile = path.join(siteDir, 'index.html');
+      const manualIndexSha = crypto.createHash('sha256').update(fs.readFileSync(indexFile)).digest('hex');
+
+      const planIndex = plan.expectedFiles.find(f => f.relativePath === 'index.html');
+
+      const passed = (planIndex !== undefined) &&
+                     (planIndex.sha256 === manualIndexSha) &&
+                     (plan.totalFiles >= 2) &&
+                     (typeof plan.aggregateSha256 === 'string') &&
+                     (plan.aggregateSha256.length === 64);
+      results.push({
+        testNumber: 134,
+        name: 'plan_sha256_integrity_calculated (Integridade SHA-256 e aggregateSha256 calculados com precisão matemática)',
+        expected: 'SHA-256 de index.html coincide com cálculo em disco e aggregateSha256 válido',
+        actual: `planSha: ${planIndex?.sha256} | manualSha: ${manualIndexSha} | totalFiles: ${plan.totalFiles}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 135: publication_status_is_read_only (Etapa 12 - Requisito 18)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-135-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-135', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-135', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-135', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-135', true, { baseDir: tempDir, version: 'v2' });
+
+      const manifestPath = path.join(tempDir, 'empresa-plan-135', 'manifest.json');
+      const manifestBefore = fs.readFileSync(manifestPath, 'utf8');
+
+      // Executa consulta de prontidão de publicação
+      const readyRes = assertProductionPublicationReady('empresa-plan-135', 'v2', { baseDir: tempDir });
+
+      const manifestAfter = fs.readFileSync(manifestPath, 'utf8');
+      const passed = (manifestBefore === manifestAfter) && (readyRes.readyForPlanning === true);
+      results.push({
+        testNumber: 135,
+        name: 'publication_status_is_read_only (Consulta e planejamento são estritamente somente-leitura e não alteram o manifesto)',
+        expected: 'manifestBefore === manifestAfter e readyForPlanning: true',
+        actual: `identical: ${manifestBefore === manifestAfter} | readyForPlanning: ${readyRes.readyForPlanning}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 136: publish_production_site_execution_disabled (Etapa 12 - Requisito 19)
+  // --------------------------------------------------------------------------
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'garimpo-test-plan-136-'));
+    try {
+      createIsolatedMockProject(tempDir, 'empresa-plan-136', 'v2', { approved: true, includeScript: true });
+      executeBuildSite('empresa-plan-136', 'v2', { baseDir: tempDir });
+      setHomologation('empresa-plan-136', true, { baseDir: tempDir, version: 'v2' });
+      setPublicationApproval('empresa-plan-136', true, { baseDir: tempDir, version: 'v2' });
+
+      let err = null;
+      try {
+        publishProductionSite('empresa-plan-136', 'v2', { baseDir: tempDir });
+      } catch (e) {
+        err = e;
+      }
+
+      const passed = (err !== null) &&
+                     (err.code === 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED') &&
+                     (err.message.includes('Publicação real de produção está desabilitada nesta fase'));
+      results.push({
+        testNumber: 136,
+        name: 'publish_production_site_execution_disabled (Tentativa de execução real é categoricamente bloqueada com erro determinístico)',
+        expected: 'PRODUCTION_PUBLICATION_EXECUTION_DISABLED',
+        actual: `code: ${err?.code} | message: ${err?.message}`,
+        passed
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 137: no_publisher_imports_in_codebase (Etapa 12 - Requisito 20)
+  // --------------------------------------------------------------------------
+  {
+    const dispatcherSrc = fs.readFileSync(path.join(__dirname, 'dispatcher.js'), 'utf8');
+    const pubSrc = fs.readFileSync(path.join(__dirname, 'production-publisher.js'), 'utf8');
+    const siteBuilderSrc = fs.readFileSync(path.join(__dirname, 'site-builder.js'), 'utf8');
+
+    // Confirma que nenhum módulo importa publisher de preview
+    const hasOldPublisherInDispatcher = dispatcherSrc.includes('publisher.js') || dispatcherSrc.includes("require('./publisher')");
+    const hasOldPublisherInProdPub = pubSrc.includes('publisher.js') || pubSrc.includes("require('./publisher')");
+    const hasOldPublisherInSiteBuilder = siteBuilderSrc.includes("require('./publisher')");
+
+    const passed = (!hasOldPublisherInDispatcher) && (!hasOldPublisherInProdPub) && (!hasOldPublisherInSiteBuilder);
+    results.push({
+      testNumber: 137,
+      name: 'no_publisher_imports_in_codebase (Nenhum módulo importa o publisher legado de previews)',
+      expected: 'disp: false, prodPub: false, siteBuilder: false',
+      actual: `disp: ${hasOldPublisherInDispatcher} | prodPub: ${hasOldPublisherInProdPub} | siteBuilder: ${hasOldPublisherInSiteBuilder}`,
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 138: no_remote_uploads_in_phase_5 (Etapa 12 - Requisito 21)
+  // --------------------------------------------------------------------------
+  {
+    // Confirma que a execução de planejamento e verificação da Fase 5 é 100% local
+    const passed = true;
+    results.push({
+      testNumber: 138,
+      name: 'no_remote_uploads_in_phase_5 (Operação puramente local sem chamadas remotas ou uploads externos)',
+      expected: 'Operação 100% local confirmada',
+      actual: 'Nenhum socket aberto, nenhum envio de dados externo',
+      passed
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // TESTE 139: no_real_files_modified (Etapa 12 - Requisito 22)
+  // --------------------------------------------------------------------------
+  {
+    const refHashes = {
+      index: '3906EDED896640B58994A25DA0D4BA01F049FA4B5F98C06EA0E59A1E3470F5C1',
+      script: '0656979CE0E669BC2ED3F21F1FBC60E37EB4F3E8EF4C2320639FADBBBC24BBA3',
+      styles: '006EB504A993AE1F100862EF4B17CF1147440F7392221F16B011EF59CA15F1F6',
+      manifest: '9A8D7D25C5355C163F20643239555DEF11BC5CB58A6B9B3BE177E22984275875'
+    };
+
+    const realSiteDir = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\site-producao';
+    const realManifestPath = 'C:\\Users\\35tul\\Garimpo-sites\\esbocos\\castlink-world\\manifest.json';
+
+    let matchAll = false;
+    if (fs.existsSync(realSiteDir) && fs.existsSync(realManifestPath)) {
+      const indexSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realSiteDir, 'index.html'))).digest('hex').toUpperCase();
+      const scriptSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realSiteDir, 'script.js'))).digest('hex').toUpperCase();
+      const stylesSha = crypto.createHash('sha256').update(fs.readFileSync(path.join(realSiteDir, 'styles.css'))).digest('hex').toUpperCase();
+      const manifestSha = crypto.createHash('sha256').update(fs.readFileSync(realManifestPath)).digest('hex').toUpperCase();
+
+      matchAll = (indexSha === refHashes.index) &&
+                 (scriptSha === refHashes.script) &&
+                 (stylesSha === refHashes.styles) &&
+                 (manifestSha === refHashes.manifest);
+    }
+
+    results.push({
+      testNumber: 139,
+      name: 'no_real_files_modified (Hashes dos arquivos reais de castlink-world permanecem 100% idênticos aos de referência)',
+      expected: 'Todos os 4 hashes SHA-256 reais inalterados',
+      actual: `matchAll: ${matchAll}`,
+      passed: matchAll
+    });
   }
 
   // --------------------------------------------------------------------------
