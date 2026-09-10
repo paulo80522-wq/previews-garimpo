@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CastLink — SANDBOX E2E | Presença Digital & Soluções Web</title>
+  <meta name="description" content="Ambiente de validação e testes E2E do Garimpo Sites. Instância isolada para testes funcionais de geração, publicação e edição.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Banner de Notificação de Sandbox -->
+  <aside class="sandbox-top-banner" role="complementary" aria-label="Aviso de Ambiente">
+    ⚡ AMBIENTE DE TESTE ISOLADO — SANDBOX E2E GARIMPO SITES | SEM CONEXÃO COM PRODUÇÃO
+  </aside>
+
+  <!-- Cabeçalho e Navegação Principal -->
+  <header class="site-header" role="banner">
+    <div class="container header-container">
+      <a href="#hero" class="brand-logo" aria-label="Página Inicial CastLink Sandbox">
+        <span class="brand-badge">SANDBOX</span>
+        <div>
+          <div class="brand-name">CastLink</div>
+          <div class="brand-sub">E2E Testing Suite</div>
+        </div>
+      </a>
+
+      <button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="Abrir Menu de Navegação">
+        ☰
+      </button>
+
+      <nav id="main-nav" class="main-nav" role="navigation" aria-label="Navegação do Site">
+        <a href="#apresentacao" class="nav-link">Sobre</a>
+        <a href="#servicos" class="nav-link">Serviços</a>
+        <a href="#diferenciais" class="nav-link">Diferenciais</a>
+        <a href="#contato" class="nav-link">Contato</a>
+        <a href="#contato" class="nav-cta-btn">Solicitar Proposta</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" role="main">
+
+    <!-- Seção Hero Principal -->
+    <section id="hero" class="hero-section" aria-labelledby="hero-title">
+      <div class="container">
+        <div class="hero-pill">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Plataforma Inteligente de Modernização Digital</span>
+        </div>
+        <h1 id="hero-title" class="hero-title">
+          <span class="gradient-text">Presença digital que transforma negócios</span>
+        </h1>
+        <p class="hero-subtitle">
+          Desenvolvemos experiências digitais de alto impacto que transformam visitantes em clientes qualificados, combinando design de classe mundial com tecnologia de ponta.
+        </p>
+        <div class="hero-actions">
+          <a href="#contato" class="btn-primary" id="hero-cta-primary">Começar Agora</a>
+          <a href="#servicos" class="btn-secondary" id="hero-cta-secondary">Conhecer Soluções</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Apresentação da Empresa -->
+    <section id="apresentacao" class="section" aria-labelledby="about-title">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Apresentação</div>
+          <h2 id="about-title" class="section-title">Inovação e Rigor Estratégico</h2>
+          <p class="section-desc">
+            A CastLink Sandbox foi concebida para demonstrar como modernizar operações comerciais e estruturar marcas com autoridade inquestionável no ecossistema digital.
+          </p>
+        </div>
+        <div class="about-grid">
+          <div class="about-card">
+            <h3>Arquitetura Orientada a Conversão</h3>
+            <p>
+              Cada elemento, layout e tipografia são projetados com base em psicologia comportamental e análise de funil, garantindo clareza e engajamento superior em cada página.
+            </p>
+            <p>
+              Substituímos soluções genéricas e sobrecarregadas por interfaces leves, otimizadas para Core Web Vitals e com zero atrito de navegação.
+            </p>
+          </div>
+          <div class="about-card">
+            <h3>Segurança e Resiliência Técnica</h3>
+            <p>
+              Infraestrutura moderna com carregamento ultrarrápido, criptografia de ponta a ponta e total conformidade com diretrizes de privacidade e governança de dados.
+            </p>
+            <p>
+              Sites que não apenas impressionam visualmente, mas operam com disponibilidade constante e desempenho escalável.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Serviços -->
+    <section id="servicos" class="section" aria-labelledby="services-title">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Serviços</div>
+          <h2 id="services-title" class="section-title">Soluções Completas para sua Empresa</h2>
+          <p class="section-desc">
+            Da concepção visual à arquitetura de alta performance, entregamos o ecossistema ideal para sua liderança de mercado.
+          </p>
+        </div>
+        <div class="services-grid">
+          <article class="service-card" id="service-1">
+            <span class="service-icon" aria-hidden="true">💎</span>
+            <h3 class="service-title">Design Editorial & Identidade</h3>
+            <p class="service-desc">
+              Criação de marcas e layouts refinados que transmitem solidez, elegância e diferenciação categórica contra competidores convencionais.
+            </p>
+          </article>
+          <article class="service-card" id="service-2">
+            <span class="service-icon" aria-hidden="true">⚡</span>
+            <h3 class="service-title">Desenvolvimento Web de Alta Performance</h3>
+            <p class="service-desc">
+              Construção com HTML semântico, CSS moderno e código limpo, atingindo notas máximas de velocidade, acessibilidade e SEO.
+            </p>
+          </article>
+          <article class="service-card" id="service-3">
+            <span class="service-icon" aria-hidden="true">📈</span>
+            <h3 class="service-title">Otimização de Conversão (CRO)</h3>
+            <p class="service-desc">
+              Estruturação inteligente de chamadas para ação (CTA), funis de agendamento e canais de contato que multiplicam leads reais.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Diferenciais -->
+    <section id="diferenciais" class="section" aria-labelledby="diff-title">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Diferenciais</div>
+          <h2 id="diff-title" class="section-title">Por que Escolher a CastLink</h2>
+          <p class="section-desc">
+            Pilares estratégicos que sustentam o crescimento sustentável da sua presença online.
+          </p>
+        </div>
+        <div class="diff-grid">
+          <div class="diff-card">
+            <div class="diff-num">100%</div>
+            <h3 class="diff-title">Responsivo</h3>
+            <p class="diff-desc">Experiência impecável em Desktop, Tablet e Mobile.</p>
+          </div>
+          <div class="diff-card">
+            <div class="diff-num">&lt;1s</div>
+            <h3 class="diff-title">Velocidade Extrema</h3>
+            <p class="diff-desc">Carregamento instantâneo sem frameworks desnecessários.</p>
+          </div>
+          <div class="diff-card">
+            <div class="diff-num">0%</div>
+            <h3 class="diff-title">Templates Genéricos</h3>
+            <p class="diff-desc">Design exclusivo alinhado ao seu posicionamento único.</p>
+          </div>
+          <div class="diff-card">
+            <div class="diff-num">24/7</div>
+            <h3 class="diff-title">Confiabilidade</h3>
+            <p class="diff-desc">Estrutura resiliente testada e auditada deterministicamente.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção de Contato e Formulário de Teste -->
+    <section id="contato" class="section" aria-labelledby="contact-title">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Interação & Contato</div>
+          <h2 id="contact-title" class="section-title">Fale Conosco em Ambiente de Teste</h2>
+          <p class="section-desc">
+            Utilize este formulário funcional de validação para simular o recebimento de solicitações comerciais.
+          </p>
+        </div>
+        <div class="contact-wrapper">
+          <form id="test-contact-form" novalidate>
+            <div class="form-group">
+              <label for="contact-name" class="form-label">Nome Completo *</label>
+              <input type="text" id="contact-name" class="form-input" placeholder="Ex: Roberto Silva" required>
+            </div>
+            <div class="form-group">
+              <label for="contact-email" class="form-label">E-mail Profissional *</label>
+              <input type="email" id="contact-email" class="form-input" placeholder="Ex: contato@empresa.com" required>
+            </div>
+            <div class="form-group">
+              <label for="contact-message" class="form-label">Mensagem ou Projeto *</label>
+              <textarea id="contact-message" class="form-textarea" placeholder="Descreva brevemente seus objetivos digitais..." required></textarea>
+            </div>
+            <button type="submit" class="btn-primary" id="btn-submit-form" style="width: 100%;">
+              Enviar Mensagem de Teste
+            </button>
+            <div id="form-status" class="form-status" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Rodapé do Site -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          CastLink — SANDBOX E2E
+        </div>
+        <div class="footer-links">
+          <a href="#apresentacao">Sobre</a>
+          <a href="#servicos">Serviços</a>
+          <a href="#diferenciais">Diferenciais</a>
+          <a href="#contato">Contato</a>
+        </div>
+      </div>
+      <div class="footer-disclaimer">
+        <p>
+          [AVISO DE ISOLAMENTO] Este site pertence exclusivamente à suíte de testes de sandbox E2E do Garimpo Sites (Slug: <code>castlink-sandbox-e2e</code>).
+        </p>
+        <p>
+          Nenhum dado é transmitido para serviços externos, destinatários reais ou ambientes de produção da CastLink.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
