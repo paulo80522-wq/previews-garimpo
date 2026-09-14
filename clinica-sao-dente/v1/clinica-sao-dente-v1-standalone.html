@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica São Dente — Medicina Dentária & Implantologia Lisboa (Lapa) | V1 Standalone</title>
+  <meta name="description" content="Protótipo Autônomo de Modernização da Clínica São Dente na Lapa e São Bento, Lisboa. Cuidados dentários de excelência, tecnologia 3D e corpo clínico especializado.">
+  <style>
+/* ==========================================================================
+   Clínica São Dente — Medicina Dentária Lisboa (Lapa / São Bento)
+   Estilo Oficial do Protótipo Visual V1 (Esboços Sites - Garimpo Sites)
+   Design System: Luminous Medical Luxury (Slate, Cyan, Crisp White)
+   ========================================================================== */
+
+:root {
+  --primary: #0284c7;
+  --primary-dark: #0369a1;
+  --primary-light: #e0f2fe;
+  --primary-glow: rgba(14, 165, 233, 0.15);
+  --accent: #0d9488;
+  --accent-light: #ccfbf1;
+  --navy-dark: #0f172a;
+  --navy-slate: #1e293b;
+  --text-main: #334155;
+  --text-muted: #64748b;
+  --bg-page: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-focus: #38bdf8;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 25px rgba(14, 165, 233, 0.2);
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+  color: var(--text-main);
+  background-color: var(--bg-page);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+img, svg {
+  vertical-align: middle;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* --------------------------------------------------------------------------
+   BARRA DE CONTROLE GARIMPO SITES (PREVIEW & DOWNLOAD)
+   -------------------------------------------------------------------------- */
+.control-bar {
+  background: #090d16;
+  color: #f8fafc;
+  padding: 10px 24px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #0284c7;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.control-bar .left-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.control-bar .status-badge {
+  background: #0284c7;
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.control-bar .project-meta {
+  color: #94a3b8;
+}
+
+.control-bar .project-meta strong {
+  color: #f1f5f9;
+}
+
+.control-bar .actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-ctrl {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-ctrl-preview {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.btn-ctrl-preview:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.btn-ctrl-download {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.btn-ctrl-download:hover {
+  background: #0369a1;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   TOPBAR CLÍNICA (CONTACTOS & LOCALIZAÇÃO)
+   -------------------------------------------------------------------------- */
+.clinic-topbar {
+  background: var(--navy-dark);
+  color: #94a3b8;
+  font-size: 12.5px;
+  padding: 8px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.clinic-topbar-info {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.clinic-topbar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clinic-topbar-item strong {
+  color: #e2e8f0;
+}
+
+.clinic-topbar-badge {
+  background: rgba(13, 148, 136, 0.2);
+  color: #2dd4bf;
+  border: 1px solid rgba(13, 148, 136, 0.4);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   NAVBAR PRINCIPAL
+   -------------------------------------------------------------------------- */
+.main-navbar {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 45px;
+  z-index: 900;
+  transition: var(--transition-normal);
+}
+
+.navbar-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-icon-box {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 22px;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
+}
+
+.brand-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--navy-dark);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  display: block;
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  font-weight: 700;
+  display: block;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-main);
+  transition: var(--transition-fast);
+  position: relative;
+  padding: 6px 0;
+}
+
+.nav-links a:hover {
+  color: var(--primary);
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+.nav-cta-btn {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #ffffff !important;
+  padding: 10px 20px !important;
+  border-radius: var(--radius-full);
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.nav-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+  color: #ffffff !important;
+}
+
+.nav-cta-btn::after {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   HERO SECTION
+   -------------------------------------------------------------------------- */
+.hero-section {
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  padding: 80px 24px 70px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.hero-pattern {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.hero-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 48px;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+}
+
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  border: 1px solid rgba(2, 132, 199, 0.2);
+}
+
+.hero-title {
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--navy-dark);
+  margin-bottom: 20px;
+  letter-spacing: -0.03em;
+}
+
+.hero-title .highlight {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-desc {
+  font-size: 18px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 32px;
+  max-width: 600px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.btn-primary-lg {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #ffffff;
+  padding: 14px 28px;
+  border-radius: var(--radius-full);
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.3);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-primary-lg:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(2, 132, 199, 0.4);
+}
+
+.btn-secondary-lg {
+  background: #ffffff;
+  color: var(--navy-dark);
+  padding: 14px 24px;
+  border-radius: var(--radius-full);
+  font-size: 16px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-fast);
+}
+
+.btn-secondary-lg:hover {
+  background: var(--bg-subtle);
+  border-color: #cbd5e1;
+}
+
+.hero-badges-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.hero-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--navy-slate);
+}
+
+.hero-badge-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+
+/* Card Visual Destaque do Hero */
+.hero-card-visual {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+}
+
+.hero-card-badge {
+  position: absolute;
+  top: -14px;
+  right: 24px;
+  background: var(--navy-dark);
+  color: #38bdf8;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.hero-quick-consult {
+  margin-top: 8px;
+}
+
+.hero-quick-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 8px;
+}
+
+.hero-quick-subtitle {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.quick-form-group {
+  margin-bottom: 14px;
+}
+
+.quick-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy-slate);
+  margin-bottom: 6px;
+}
+
+.quick-input, .quick-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text-main);
+  background: var(--bg-page);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.quick-input:focus, .quick-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+  background: #ffffff;
+}
+
+.btn-quick-submit {
+  width: 100%;
+  background: var(--primary);
+  color: #ffffff;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  transition: background var(--transition-fast);
+}
+
+.btn-quick-submit:hover {
+  background: var(--primary-dark);
+}
+
+/* --------------------------------------------------------------------------
+   FAIXA DE DIFERENCIAIS CLÍNICOS
+   -------------------------------------------------------------------------- */
+.stats-strip {
+  background: var(--navy-dark);
+  color: #ffffff;
+  padding: 36px 24px;
+}
+
+.stats-grid {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 12.5px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   SEÇÃO DE ESPECIALIDADES MÉDICAS
+   -------------------------------------------------------------------------- */
+.section-wrapper {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+
+.section-header {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 50px;
+}
+
+.section-tag {
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.section-heading {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--navy-dark);
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+}
+
+.section-subtext {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.specialties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 24px;
+}
+
+.specialty-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 26px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+}
+
+.specialty-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: #cbd5e1;
+}
+
+.specialty-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 18px;
+}
+
+.specialty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 10px;
+}
+
+.specialty-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 18px;
+  flex-grow: 1;
+}
+
+.specialty-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: gap var(--transition-fast);
+}
+
+.specialty-link:hover {
+  gap: 10px;
+  color: var(--primary-dark);
+}
+
+/* --------------------------------------------------------------------------
+   SEÇÃO CORPO CLÍNICO
+   -------------------------------------------------------------------------- */
+.team-section {
+  background: #f1f5f9;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.doctors-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.doctor-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.doctor-avatar-wrap {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.doctor-avatar-icon {
+  font-size: 64px;
+  opacity: 0.85;
+}
+
+.doctor-role-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  background: var(--navy-dark);
+  color: #38bdf8;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.doctor-info {
+  padding: 24px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.doctor-name {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--navy-dark);
+  margin-bottom: 6px;
+}
+
+.doctor-specialty {
+  font-size: 13.5px;
+  color: var(--primary-dark);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.doctor-bio {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.doctor-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-tag {
+  background: var(--bg-subtle);
+  color: var(--navy-slate);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   TECNOLOGIA & ASSEPSIA
+   -------------------------------------------------------------------------- */
+.tech-banner {
+  background: linear-gradient(135deg, var(--navy-dark) 0%, #1e293b 100%);
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 48px;
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.tech-content h3 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.tech-content p {
+  color: #94a3b8;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.tech-features {
+  list-style: none;
+}
+
+.tech-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #e2e8f0;
+}
+
+.tech-icon-check {
+  color: #2dd4bf;
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.tech-box-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 24px;
+}
+
+.tech-box-card h4 {
+  color: #38bdf8;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.tech-box-card p {
+  color: #cbd5e1;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   LOCALIZAÇÃO E ACESSOS
+   -------------------------------------------------------------------------- */
+.location-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 36px;
+  align-items: stretch;
+}
+
+.location-details-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+}
+
+.location-item {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.location-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.location-item h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 4px;
+}
+
+.location-item p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.map-mockup-frame {
+  background: #e2e8f0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  position: relative;
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.map-pin-pulse {
+  width: 60px;
+  height: 60px;
+  background: var(--primary-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--primary);
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 10px rgba(2, 132, 199, 0.15);
+}
+
+/* --------------------------------------------------------------------------
+   WIDGET INTERATIVO DE MARCAÇÃO
+   -------------------------------------------------------------------------- */
+.booking-section {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.booking-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.booking-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.booking-form-full {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy-slate);
+  margin-bottom: 6px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  color: var(--text-main);
+  background: var(--bg-page);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+  background: #ffffff;
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.form-checkbox-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.form-checkbox-wrap input {
+  margin-top: 3px;
+}
+
+.btn-submit-booking {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #ffffff;
+  padding: 16px;
+  border-radius: var(--radius-full);
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-submit-booking:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
+}
+
+.form-feedback-message {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  display: none;
+}
+
+.form-feedback-message.success {
+  display: block;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+/* --------------------------------------------------------------------------
+   FOOTER INSTITUCIONAL
+   -------------------------------------------------------------------------- */
+.main-footer {
+  background: var(--navy-dark);
+  color: #94a3b8;
+  padding: 60px 24px 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.footer-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.footer-brand h4 {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.footer-brand p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+.footer-heading {
+  color: #f1f5f9;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+.footer-links {
+  list-style: none;
+}
+
+.footer-links li {
+  margin-bottom: 10px;
+}
+
+.footer-links a {
+  font-size: 13.5px;
+  color: #94a3b8;
+  transition: color var(--transition-fast);
+}
+
+.footer-links a:hover {
+  color: #38bdf8;
+}
+
+.footer-bottom {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #64748b;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   BARRA FLUTUANTE MOBILE
+   -------------------------------------------------------------------------- */
+.mobile-action-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 16px;
+  z-index: 999;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  gap: 12px;
+}
+
+.btn-mobile-act {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.btn-mobile-call {
+  background: var(--navy-dark);
+  color: #ffffff;
+}
+
+.btn-mobile-whatsapp {
+  background: #25d366;
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVIDADE
+   -------------------------------------------------------------------------- */
+@media (max-width: 992px) {
+  .hero-container {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .doctors-grid {
+    grid-template-columns: 1fr;
+  }
+  .tech-banner {
+    grid-template-columns: 1fr;
+    padding: 32px;
+  }
+  .location-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-container {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .control-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 16px;
+  }
+  .control-bar .actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .clinic-topbar {
+    display: none;
+  }
+  .nav-links {
+    display: none;
+  }
+  .hero-title {
+    font-size: 32px;
+  }
+  .hero-desc {
+    font-size: 16px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .booking-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-container {
+    grid-template-columns: 1fr;
+  }
+  .mobile-action-bar {
+    display: flex;
+  }
+  body {
+    padding-bottom: 60px;
+  }
+}
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Controle Garimpo Sites -->
+  <div class="control-bar" id="preview-control-bar">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — DRAFT v1 (STANDALONE)</span>
+      <span class="project-meta">Projeto: <strong>Clínica São Dente (Lisboa - Lapa)</strong> | Versão: <strong>v1</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#especialidades" class="btn-ctrl btn-ctrl-preview" title="Explorar especialidades">👁️ ESPECIALIDADES</a>
+      <a href="#marcacao" class="btn-ctrl btn-ctrl-preview" title="Testar marcação de consulta">📅 AGENDAMENTO</a>
+      <button onclick="window.print()" class="btn-ctrl btn-ctrl-download" title="Imprimir ou Salvar como PDF">🖨️ IMPRIMIR / PDF</button>
+    </div>
+  </div>
+
+  <!-- TopBar Contactos Reais -->
+  <div class="clinic-topbar">
+    <div class="clinic-topbar-info">
+      <span class="clinic-topbar-item">📍 <strong>Rua Borges Carneiro, 20B</strong>, 1200-619 Lisboa (Lapa / São Bento)</span>
+      <span class="clinic-topbar-item">📞 <strong>(+351) 213 970 096</strong> <small>(Rede Fixa)</small></span>
+      <span class="clinic-topbar-item">📱 <strong>(+351) 965 479 533</strong> <small>(WhatsApp / Móvel)</small></span>
+      <span class="clinic-topbar-item">⏰ <strong>Seg - Sex:</strong> 09h00 - 19h00 | <strong>Sáb:</strong> 09h00 - 13h00</span>
+    </div>
+    <div>
+      <span class="clinic-topbar-badge">Atendimento de Urgências Dentárias</span>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <header class="main-navbar">
+    <div class="navbar-container">
+      <a href="#" class="brand-logo">
+        <div class="brand-icon-box">🦷</div>
+        <div>
+          <span class="brand-title">Clínica São Dente</span>
+          <span class="brand-subtitle">Medicina Dentária Lisboa • Desde 2015</span>
+        </div>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#especialidades">Especialidades</a></li>
+          <li><a href="#corpo-clinico">Corpo Clínico</a></li>
+          <li><a href="#tecnologia">Tecnologia & Diagnóstico</a></li>
+          <li><a href="#localizacao">Como Chegar</a></li>
+          <li><a href="#marcacao" class="nav-cta-btn">Marcar Consulta</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-pattern"></div>
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-pill">
+          <span>✨</span>
+          <span>Mais de 10 anos de rigor clínico e dedicação na Lapa</span>
+        </div>
+        <h1 class="hero-title">
+          Medicina Dentária de Excelência no <span class="highlight">coração de Lisboa</span>
+        </h1>
+        <p class="hero-desc">
+          Desde 2015 que a <strong>Clínica São Dente</strong> proporciona cuidados orais integrados com diferenciação médica, equipamentos de diagnóstico digital de última geração e os mais exigentes protocolos de assepsia.
+        </p>
+        <div class="hero-actions">
+          <a href="#marcacao" class="btn-primary-lg">
+            <span>📅 Marcar Avaliação Clínica</span>
+          </a>
+          <a href="#especialidades" class="btn-secondary-lg">
+            <span>Explorar Especialidades</span>
+            <span>↓</span>
+          </a>
+        </div>
+        <div class="hero-badges-row">
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>Corpo Clínico Multidisciplinar</span>
+          </div>
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>CBCT 3D e Radiografia Digital</span>
+          </div>
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>Atendimento Humanizado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Interativo de Triagem Rápida -->
+      <div class="hero-card-visual">
+        <span class="hero-card-badge">CONVITE DE AGENDAMENTO</span>
+        <div class="hero-quick-consult">
+          <h3 class="hero-quick-title">Agende a sua consulta</h3>
+          <p class="hero-quick-subtitle">Selecione o motivo da sua visita para encaminhamento ao especialista dedicado.</p>
+          <form id="hero-quick-form" onsubmit="event.preventDefault(); window.location.hash = 'marcacao';">
+            <div class="quick-form-group">
+              <label class="quick-label" for="hero-motivo-std">Motivo Principal da Consulta</label>
+              <select id="hero-motivo-std" class="quick-select">
+                <option value="Agendar Consulta Geral">Primeira Consulta / Check-up Geral</option>
+                <option value="Ortodontia">Ortodontia (Alinhadores / Aparelhos)</option>
+                <option value="Implantes Dentários">Implantes & Reabilitação Fixa</option>
+                <option value="São Dentes Kids">São Dentes Kids (Odontopediatria)</option>
+                <option value="Dentisteria">Dentisteria Estética & Branqueamento</option>
+                <option value="Patologia e Medicina Oral">Patologia & Medicina Oral</option>
+                <option value="Higiene Oral">Higiene Oral & Destartarização</option>
+              </select>
+            </div>
+            <div class="quick-form-group">
+              <label class="quick-label" for="hero-contact-pref-std">Contacto Preferencial</label>
+              <input type="text" id="hero-contact-pref-std" class="quick-input" placeholder="Seu nome ou telemóvel">
+            </div>
+            <button type="submit" class="btn-quick-submit">
+              <span>Continuar Marcação</span>
+              <span>→</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Faixa de Métricas -->
+  <section class="stats-strip">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-icon">🏥</div>
+        <div>
+          <div class="stat-number">Desde 2015</div>
+          <div class="stat-label">Clínica de referência na Lapa e São Bento</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">👨‍⚕️</div>
+        <div>
+          <div class="stat-number">Especialistas</div>
+          <div class="stat-label">Médicos dentistas dedicados por área</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">🔬</div>
+        <div>
+          <div class="stat-number">Diagnóstico 3D</div>
+          <div class="stat-label">Tomografia CBCT & Radiografia digital</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">🛡️</div>
+        <div>
+          <div class="stat-number">Rigor Clínico</div>
+          <div class="stat-label">Protocolos estritos de assepsia e segurança</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Especialidades -->
+  <section id="especialidades" class="section-wrapper">
+    <div class="section-header">
+      <span class="section-tag">Cuidados Dentários Completos</span>
+      <h2 class="section-heading">Especialidades Clínicas Integradas</h2>
+      <p class="section-subtext">
+        Planos de tratamento personalizados com foco na preservação biológica, saúde oral a longo prazo e harmonia estética do sorriso.
+      </p>
+    </div>
+
+    <div class="specialties-grid">
+      <div class="specialty-card">
+        <div class="specialty-icon-box">📐</div>
+        <h3 class="specialty-title">Ortodontia</h3>
+        <p class="specialty-desc">
+          Correção de dentes desalinhados e oclusão através de alinhadores transparentes modernos ou aparelhos fixos estéticos, tanto para jovens como para adultos.
+        </p>
+        <a href="#marcacao" class="specialty-link">Agendar avaliação ortodôntica <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🔩</div>
+        <h3 class="specialty-title">Implantes Dentários</h3>
+        <p class="specialty-desc">
+          Reabilitação oral avançada com implantes de titânio de alta biocompatibilidade, desde dentes unitários até reconstruções completas com carga imediata.
+        </p>
+        <a href="#marcacao" class="specialty-link">Saber mais sobre implantes <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🩺</div>
+        <h3 class="specialty-title">Patologia & Medicina Oral</h3>
+        <p class="specialty-desc">
+          Diagnóstico e tratamento especializado de lesões na mucosa oral, dores orofaciais e prevenção sistemática de afeções orais graves com referência médica.
+        </p>
+        <a href="#marcacao" class="specialty-link">Consultar especialista <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🧸</div>
+        <h3 class="specialty-title">São Dentes Kids</h3>
+        <p class="specialty-desc">
+          Odontopediatria humanizada num ambiente seguro e tranquilo, promovendo hábitos de higiene oral positivos desde a primeira infância.
+        </p>
+        <a href="#marcacao" class="specialty-link">Marcar consulta infantil <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">✨</div>
+        <h3 class="specialty-title">Dentisteria & Estética</h3>
+        <p class="specialty-desc">
+          Restaurações estéticas diretas em resina composta, facetas cerâmicas e branqueamento dentário seguro para devolver a luminosidade natural ao seu sorriso.
+        </p>
+        <a href="#marcacao" class="specialty-link">Avaliar estética dentária <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">⚕️</div>
+        <h3 class="specialty-title">Cirurgia Oral</h3>
+        <p class="specialty-desc">
+          Extrações cirúrgicas simples e complexas (dentes do siso inclusos), frenectomias e cirurgia pré-protética sob rigorosa técnica asséptica e anestesia local eficaz.
+        </p>
+        <a href="#marcacao" class="specialty-link">Agendar cirurgia oral <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🦷</div>
+        <h3 class="specialty-title">Prostodontia</h3>
+        <p class="specialty-desc">
+          Reabilitação da mastigação e fonética através de coroas em zircónia, pontes fixas e próteses esqueléticas ou acrílicas de grande precisão anatómica.
+        </p>
+        <a href="#marcacao" class="specialty-link">Reabilitação protética <span>→</span></a>
+      </div>
+
+      <div class="specialty-card">
+        <div class="specialty-icon-box">💧</div>
+        <h3 class="specialty-title">Higiene Oral & Profilaxia</h3>
+        <p class="specialty-desc">
+          Remoção de tártaro ultrassónica, polimento com jato de bicarbonato e controlo periodontal para prevenção de gengivite, cáries e perda dentária.
+        </p>
+        <a href="#marcacao" class="specialty-link">Marcar destartarização <span>→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Corpo Clínico -->
+  <section id="corpo-clinico" class="team-section">
+    <div class="section-wrapper">
+      <div class="section-header">
+        <span class="section-tag">Experiência Médica & Deontologia</span>
+        <h2 class="section-heading">Equipa Médica Multidisciplinar</h2>
+        <p class="section-subtext">
+          Profissionais com formação contínua e vasta prática clínica, dedicados ao acompanhamento atento e personalizado de cada paciente.
+        </p>
+      </div>
+
+      <div class="doctors-grid">
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👨‍⚕️</span>
+            <span class="doctor-role-badge">MÉDICO DENTISTA</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Dr. Sancho Silvestre</h3>
+            <div class="doctor-specialty">Medicina Dentária & Reabilitação Oral</div>
+            <p class="doctor-bio">
+              Com foco na reabilitação estética e funcional integrada, diagnóstico minucioso e planeamento cirúrgico de precisão para tratamentos orais duradouros.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Reabilitação Oral</span>
+              <span class="doc-tag">Implantologia</span>
+              <span class="doc-tag">Oclusão</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👩‍⚕️</span>
+            <span class="doctor-role-badge">ESPECIALISTA SÉNIOR</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Profª. Drª. Maria Cristina de Faria Teixeira</h3>
+            <div class="doctor-specialty">Patologia & Medicina Oral</div>
+            <p class="doctor-bio">
+              Referência em patologia oral, diagnóstico de lesões dos tecidos moles da cavidade oral e interface entre medicina geral e saúde dentária.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Patologia Oral</span>
+              <span class="doc-tag">Medicina Oral</span>
+              <span class="doc-tag">Diagnóstico Clínico</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👩‍⚕️</span>
+            <span class="doctor-role-badge">MÉDICA DENTISTA</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Dra. Beatriz Vaz Duarte</h3>
+            <div class="doctor-specialty">Medicina Dentária Geral & Ortodontia</div>
+            <p class="doctor-bio">
+              Dedicada ao alinhamento dentário funcional, tratamentos preventivos e cuidados restauradores adaptados às necessidades individuais de cada paciente.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Ortodontia</span>
+              <span class="doc-tag">Dentisteria</span>
+              <span class="doc-tag">Prevenção</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Banner de Tecnologia -->
+      <div id="tecnologia" class="tech-banner">
+        <div class="tech-content">
+          <h3>Tecnologia Diagnóstica & Assepsia Avançada</h3>
+          <p>
+            A Clínica São Dente conta com equipamentos modernos que reduzem a exposição radiológica e asseguram a máxima previsibilidade clínica em cada intervenção.
+          </p>
+          <ul class="tech-features">
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Tomografia CBCT 3D e Radiografia Digital:</strong> exames imagiológicos tridimensionais no local para planeamento seguro.</span>
+            </li>
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Protocolos de Esterilização Classe B:</strong> ciclo de assepsia hospitalar com rastreabilidade total de materiais.</span>
+            </li>
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Materiais Biocompatíveis Premium:</strong> resinas e ligas certificadas para resultados estéticos de alta longevidade.</span>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <div class="tech-box-card">
+            <h4>Segurança e Bem-Estar do Paciente</h4>
+            <p>
+              Todos os gabinetes clínicos seguem normativas rigorosas de desinfeção de superfícies e ventilação contínua entre consultas, garantindo um ambiente limpo e seguro para toda a família.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Localização -->
+  <section id="localizacao" class="section-wrapper">
+    <div class="section-header">
+      <span class="section-tag">Acessibilidade e Centralidade</span>
+      <h2 class="section-heading">Localização na Lapa e São Bento</h2>
+      <p class="section-subtext">
+        Fácil acesso por transportes públicos e estacionamento na envolvente, a poucos minutos do Marquês de Pombal e do Rato.
+      </p>
+    </div>
+
+    <div class="location-grid">
+      <div class="location-details-box">
+        <div class="location-item">
+          <div class="location-icon-badge">📍</div>
+          <div>
+            <h4>Morada da Clínica</h4>
+            <p><strong>Rua Borges Carneiro, 20B</strong><br>1200-619 Lisboa, Portugal</p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">🚇</div>
+          <div>
+            <h4>Transportes Públicos</h4>
+            <p>
+              • <strong>Metro:</strong> Linha Amarela — Estação do Rato (7 min a pé)<br>
+              • <strong>Autocarros Carris:</strong> Carreiras 773 e 713<br>
+              • <strong>Eléctrico Tradicional:</strong> Linha 28E
+            </p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">📞</div>
+          <div>
+            <h4>Telefones & WhatsApp</h4>
+            <p>
+              • Fixo: <strong>(+351) 213 970 096</strong><br>
+              • Telemóvel / WhatsApp: <strong>(+351) 965 479 533</strong> / <strong>(+351) 965 479 515</strong><br>
+              • E-mail: <strong>clinica@saodente.pt</strong>
+            </p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">⏰</div>
+          <div>
+            <h4>Horário de Atendimento</h4>
+            <p>
+              • <strong>Segunda a Sexta-feira:</strong> 09:00 às 19:00<br>
+              • <strong>Sábado:</strong> 09:00 às 13:00<br>
+              • <strong>Domingo e Feriados:</strong> Encerrado
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-mockup-frame">
+        <div class="map-pin-pulse">📍</div>
+        <h3 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">Clínica São Dente — Lapa</h3>
+        <p style="color: #64748b; font-size: 14px; max-width: 320px; margin-bottom: 20px;">
+          Coordenadas GPS: 38.711775, -9.157524<br>
+          Zona nobre da Lapa / São Bento, Lisboa
+        </p>
+        <a href="https://maps.google.com/?q=38.711775,-9.157524" target="_blank" rel="noopener noreferrer" class="btn-secondary-lg" style="padding: 10px 20px; font-size: 14px;">
+          <span>🗺️ Abrir no Google Maps</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marcação de Consulta -->
+  <section id="marcacao" class="section-wrapper booking-section">
+    <div class="section-header">
+      <span class="section-tag">Agendamento Simplificado</span>
+      <h2 class="section-heading">Marcar Consulta na Clínica São Dente</h2>
+      <p class="section-subtext">
+        Preencha os dados abaixo e a nossa equipa de receção entrará em contacto para confirmar o dia e hora de maior conveniência.
+      </p>
+    </div>
+
+    <div class="booking-card">
+      <form id="booking-form-std" onsubmit="handleBookingSubmit(event)">
+        <div class="booking-form-grid">
+          <div class="form-group">
+            <label for="booking-nome-std">Nome Completo *</label>
+            <input type="text" id="booking-nome-std" class="form-control" placeholder="Ex.: Maria Silva" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-telefone-std">Telefone ou Telemóvel *</label>
+            <input type="tel" id="booking-telefone-std" class="form-control" placeholder="Ex.: +351 912 345 678" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-email-std">E-mail *</label>
+            <input type="email" id="booking-email-std" class="form-control" placeholder="Ex.: maria.silva@exemplo.pt" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-especialidade-std">Especialidade Pretendida *</label>
+            <select id="booking-especialidade-std" class="form-control" required>
+              <option value="">Selecione o tratamento...</option>
+              <option value="Primeira Consulta / Check-up">Primeira Consulta / Avaliação Geral</option>
+              <option value="Ortodontia">Ortodontia (Alinhadores / Aparelhos)</option>
+              <option value="Implantes Dentários">Implantes Dentários & Reabilitação</option>
+              <option value="Patologia e Medicina Oral">Patologia & Medicina Oral</option>
+              <option value="São Dentes Kids">São Dentes Kids (Odontopediatria)</option>
+              <option value="Dentisteria e Estética">Dentisteria Estética / Branqueamento</option>
+              <option value="Cirurgia Oral">Cirurgia Oral / Extração</option>
+              <option value="Higiene Oral">Higiene Oral / Destartarização</option>
+              <option value="Radiografia ou CBCT">Exame Radiológico (CBCT 3D / Raio-X)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-periodo-std">Período Preferencial</label>
+            <select id="booking-periodo-std" class="form-control">
+              <option value="Qualquer horário">Indiferente / Primeiro horário disponível</option>
+              <option value="Manhã (09h - 13h)">Manhã (09h00 às 13h00)</option>
+              <option value="Tarde (14h - 19h)">Tarde (14h00 às 19h00)</option>
+              <option value="Sábado (09h - 13h)">Sábado de manhã (09h00 às 13h00)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-urgencia-std">Existe dor aguda ou urgência?</label>
+            <select id="booking-urgencia-std" class="form-control">
+              <option value="Não">Não — Consulta de rotina / planeada</option>
+              <option value="Sim - Dor moderada">Sim — Dor moderada / desconforto recente</option>
+              <option value="Sim - Urgência aguda">Sim — Urgência aguda (atendimento prioritário)</option>
+            </select>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <label for="booking-mensagem-std">Observações ou Sintomas (Opcional)</label>
+            <textarea id="booking-mensagem-std" class="form-control" placeholder="Descreva sucintamente o motivo do agendamento ou histórico relevante..."></textarea>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <div class="form-checkbox-wrap">
+              <input type="checkbox" id="booking-consent-std" required checked>
+              <label for="booking-consent-std">
+                Autorizo o tratamento dos meus contactos pela Clínica São Dente exclusivamente para a gestão e confirmação deste agendamento, ao abrigo da legislação de proteção de dados (RGPD).
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <button type="submit" class="btn-submit-booking">
+              <span>📅 Confirmar Solicitação de Marcação</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="booking-feedback-std" class="form-feedback-message"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <h4>Clínica São Dente</h4>
+        <p>
+          Medicina Dentária e Reabilitação Oral de excelência no coração de Lisboa. Cuidados multidisciplinares na Lapa e São Bento com tecnologia de diagnóstico digital avançado.
+        </p>
+        <p style="font-size: 12px; color: #64748b;">
+          Entidade de saúde registada na Entidade Reguladora da Saúde (ERS) e profissionais inscritos na Ordem dos Médicos Dentistas (OMD).
+        </p>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Especialidades</h5>
+        <ul class="footer-links">
+          <li><a href="#especialidades">Ortodontia</a></li>
+          <li><a href="#especialidades">Implantes Dentários</a></li>
+          <li><a href="#especialidades">Patologia e Medicina Oral</a></li>
+          <li><a href="#especialidades">São Dentes Kids</a></li>
+          <li><a href="#especialidades">Dentisteria Estética</a></li>
+          <li><a href="#especialidades">Higiene Oral</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Acesso Rápido</h5>
+        <ul class="footer-links">
+          <li><a href="#corpo-clinico">Corpo Clínico</a></li>
+          <li><a href="#tecnologia">Equipamento CBCT 3D</a></li>
+          <li><a href="#localizacao">Como Chegar (Metro/Carris)</a></li>
+          <li><a href="#marcacao">Marcação Online</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Contactos Oficiais</h5>
+        <ul class="footer-links">
+          <li>📍 Rua Borges Carneiro, 20B<br>1200-619 Lisboa</li>
+          <li>📞 (+351) 213 970 096 <small>(Rede Fixa)</small></li>
+          <li>📱 (+351) 965 479 533 <small>(Rede Móvel / WhatsApp)</small></li>
+          <li>✉️ clinica@saodente.pt</li>
+          <li>⏰ Seg a Sex: 9h - 19h | Sáb: 9h - 13h</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>
+        © 2026 Clínica São Dente. Todos os direitos reservados.
+      </div>
+      <div>
+        Protótipo conceitual para modernização digital • Garimpo Sites (Versão Autônoma Offline)
+      </div>
+    </div>
+  </footer>
+
+  <!-- Barra Flutuante Mobile -->
+  <div class="mobile-action-bar">
+    <a href="tel:+351213970096" class="btn-mobile-act btn-mobile-call">
+      <span>📞 Ligar Agora</span>
+    </a>
+    <a href="https://wa.me/351965479533?text=Ol%C3%A1%2C%20gostaria%20de%20marcar%20uma%20consulta%20na%20Cl%C3%ADnica%20S%C3%A3o%20Dente." target="_blank" rel="noopener noreferrer" class="btn-mobile-act btn-mobile-whatsapp">
+      <span>💬 WhatsApp</span>
+    </a>
+  </div>
+
+  <script>
+    function handleBookingSubmit(event) {
+      event.preventDefault();
+      const nome = document.getElementById('booking-nome-std').value;
+      const telefone = document.getElementById('booking-telefone-std').value;
+      const especialidade = document.getElementById('booking-especialidade-std').value;
+      const periodo = document.getElementById('booking-periodo-std').value;
+      const feedbackBox = document.getElementById('booking-feedback-std');
+
+      feedbackBox.className = 'form-feedback-message success';
+      feedbackBox.innerHTML = `
+        <strong>✔ Solicitação de Marcação Registada com Sucesso!</strong><br>
+        Obrigado, <strong>${nome}</strong>. A receção da Clínica São Dente entrará em contacto para o número <strong>${telefone}</strong> para confirmar a sua consulta de <strong>${especialidade}</strong> no período <strong>${periodo}</strong>.<br>
+        <span style="font-size: 12px; opacity: 0.9; margin-top: 4px; display: inline-block;">
+          ⚡ [Demonstração de Protótipo Visual — Versão Autônoma Offline].
+        </span>
+      `;
+      feedbackBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  </script>
+
+</body>
+</html>
