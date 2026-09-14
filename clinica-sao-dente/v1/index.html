@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica São Dente — Medicina Dentária & Implantologia Lisboa (Lapa) | V1</title>
+  <meta name="description" content="Protótipo de Modernização da Clínica São Dente na Lapa e São Bento, Lisboa. Cuidados dentários de excelência, tecnologia 3D e corpo clínico especializado.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ==========================================================================
+       BARRA DE CONTROLE GARIMPO SITES (PREVIEW & DOWNLOAD)
+       ========================================================================== -->
+  <div class="control-bar" id="preview-control-bar">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — DRAFT v1</span>
+      <span class="project-meta">Projeto: <strong>Clínica São Dente (Lisboa - Lapa)</strong> | Versão: <strong>v1</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#especialidades" class="btn-ctrl btn-ctrl-preview" title="Explorar especialidades">👁️ ESPECIALIDADES</a>
+      <a href="#marcacao" class="btn-ctrl btn-ctrl-preview" title="Testar marcação de consulta">📅 AGENDAMENTO</a>
+      <a href="clinica-sao-dente-v1-standalone.html" download="clinica-sao-dente-v1-standalone.html" class="btn-ctrl btn-ctrl-download" title="Baixar protótipo autônomo offline">📥 BAIXAR PROTÓTIPO</a>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       TOPBAR CLÍNICA (CONTACTOS REAIS VERIFICADOS)
+       ========================================================================== -->
+  <div class="clinic-topbar">
+    <div class="clinic-topbar-info">
+      <span class="clinic-topbar-item">📍 <strong>Rua Borges Carneiro, 20B</strong>, 1200-619 Lisboa (Lapa / São Bento)</span>
+      <span class="clinic-topbar-item">📞 <strong>(+351) 213 970 096</strong> <small>(Rede Fixa)</small></span>
+      <span class="clinic-topbar-item">📱 <strong>(+351) 965 479 533</strong> <small>(WhatsApp / Móvel)</small></span>
+      <span class="clinic-topbar-item">⏰ <strong>Seg - Sex:</strong> 09h00 - 19h00 | <strong>Sáb:</strong> 09h00 - 13h00</span>
+    </div>
+    <div>
+      <span class="clinic-topbar-badge">Atendimento de Urgências Dentárias</span>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       NAVBAR INSTITUCIONAL
+       ========================================================================== -->
+  <header class="main-navbar">
+    <div class="navbar-container">
+      <a href="#" class="brand-logo">
+        <div class="brand-icon-box">🦷</div>
+        <div>
+          <span class="brand-title">Clínica São Dente</span>
+          <span class="brand-subtitle">Medicina Dentária Lisboa • Desde 2015</span>
+        </div>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#especialidades">Especialidades</a></li>
+          <li><a href="#corpo-clinico">Corpo Clínico</a></li>
+          <li><a href="#tecnologia">Tecnologia & Diagnóstico</a></li>
+          <li><a href="#localizacao">Como Chegar</a></li>
+          <li><a href="#marcacao" class="nav-cta-btn">Marcar Consulta</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       HERO SECTION (DIREÇÃO VISUAL MODERNA & ALTA CONVERSÃO)
+       ========================================================================== -->
+  <section class="hero-section">
+    <div class="hero-pattern"></div>
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-pill">
+          <span>✨</span>
+          <span>Mais de 10 anos de rigor clínico e dedicação na Lapa</span>
+        </div>
+        <h1 class="hero-title">
+          Medicina Dentária de Excelência no <span class="highlight">coração de Lisboa</span>
+        </h1>
+        <p class="hero-desc">
+          Desde 2015 que a <strong>Clínica São Dente</strong> proporciona cuidados orais integrados com diferenciação médica, equipamentos de diagnóstico digital de última geração e os mais exigentes protocolos de assepsia.
+        </p>
+        <div class="hero-actions">
+          <a href="#marcacao" class="btn-primary-lg">
+            <span>📅 Marcar Avaliação Clínica</span>
+          </a>
+          <a href="#especialidades" class="btn-secondary-lg">
+            <span>Explorar Especialidades</span>
+            <span>↓</span>
+          </a>
+        </div>
+        <div class="hero-badges-row">
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>Corpo Clínico Multidisciplinar</span>
+          </div>
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>CBCT 3D e Radiografia Digital</span>
+          </div>
+          <div class="hero-badge-item">
+            <span class="hero-badge-icon">✓</span>
+            <span>Atendimento Humanizado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Interativo de Triagem Rápida -->
+      <div class="hero-card-visual">
+        <span class="hero-card-badge">CONVITE DE AGENDAMENTO</span>
+        <div class="hero-quick-consult">
+          <h3 class="hero-quick-title">Agende a sua consulta</h3>
+          <p class="hero-quick-subtitle">Selecione o motivo da sua visita para encaminhamento ao especialista dedicado.</p>
+          <form id="hero-quick-form" onsubmit="event.preventDefault(); window.location.hash = 'marcacao';">
+            <div class="quick-form-group">
+              <label class="quick-label" for="hero-motivo">Motivo Principal da Consulta</label>
+              <select id="hero-motivo" class="quick-select">
+                <option value="Agendar Consulta Geral">Primeira Consulta / Check-up Geral</option>
+                <option value="Ortodontia">Ortodontia (Alinhadores / Aparelhos)</option>
+                <option value="Implantes Dentários">Implantes & Reabilitação Fixa</option>
+                <option value="São Dentes Kids">São Dentes Kids (Odontopediatria)</option>
+                <option value="Dentisteria">Dentisteria Estética & Branqueamento</option>
+                <option value="Patologia e Medicina Oral">Patologia & Medicina Oral</option>
+                <option value="Higiene Oral">Higiene Oral & Destartarização</option>
+              </select>
+            </div>
+            <div class="quick-form-group">
+              <label class="quick-label" for="hero-contact-pref">Contacto Preferencial</label>
+              <input type="text" id="hero-contact-pref" class="quick-input" placeholder="Seu nome ou telemóvel">
+            </div>
+            <button type="submit" class="btn-quick-submit">
+              <span>Continuar Marcação</span>
+              <span>→</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       FAIXA DE INDICADORES CLÍNICOS
+       ========================================================================== -->
+  <section class="stats-strip">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-icon">🏥</div>
+        <div>
+          <div class="stat-number">Desde 2015</div>
+          <div class="stat-label">Clínica de referência na Lapa e São Bento</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">👨‍⚕️</div>
+        <div>
+          <div class="stat-number">Especialistas</div>
+          <div class="stat-label">Médicos dentistas dedicados por área</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">🔬</div>
+        <div>
+          <div class="stat-number">Diagnóstico 3D</div>
+          <div class="stat-label">Tomografia CBCT & Radiografia digital</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">🛡️</div>
+        <div>
+          <div class="stat-number">Rigor Clínico</div>
+          <div class="stat-label">Protocolos estritos de assepsia e segurança</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       SEÇÃO DE ESPECIALIDADES MÉDICAS (FACTUAIS E CONFIRMADAS)
+       ========================================================================== -->
+  <section id="especialidades" class="section-wrapper">
+    <div class="section-header">
+      <span class="section-tag">Cuidados Dentários Completos</span>
+      <h2 class="section-heading">Especialidades Clínicas Integradas</h2>
+      <p class="section-subtext">
+        Planos de tratamento personalizados com foco na preservação biológica, saúde oral a longo prazo e harmonia estética do sorriso.
+      </p>
+    </div>
+
+    <div class="specialties-grid">
+      <!-- Card 1: Ortodontia -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">📐</div>
+        <h3 class="specialty-title">Ortodontia</h3>
+        <p class="specialty-desc">
+          Correção de dentes desalinhados e oclusão através de alinhadores transparentes modernos ou aparelhos fixos estéticos, tanto para jovens como para adultos.
+        </p>
+        <a href="#marcacao" class="specialty-link">Agendar avaliação ortodôntica <span>→</span></a>
+      </div>
+
+      <!-- Card 2: Implantes Dentários -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🔩</div>
+        <h3 class="specialty-title">Implantes Dentários</h3>
+        <p class="specialty-desc">
+          Reabilitação oral avançada com implantes de titânio de alta biocompatibilidade, desde dentes unitários até reconstruções completas com carga imediata.
+        </p>
+        <a href="#marcacao" class="specialty-link">Saber mais sobre implantes <span>→</span></a>
+      </div>
+
+      <!-- Card 3: Patologia & Medicina Oral -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🩺</div>
+        <h3 class="specialty-title">Patologia & Medicina Oral</h3>
+        <p class="specialty-desc">
+          Diagnóstico e tratamento especializado de lesões na mucosa oral, dores orofaciais e prevenção sistemática de afeções orais graves com referência médica.
+        </p>
+        <a href="#marcacao" class="specialty-link">Consultar especialista <span>→</span></a>
+      </div>
+
+      <!-- Card 4: São Dentes Kids -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🧸</div>
+        <h3 class="specialty-title">São Dentes Kids</h3>
+        <p class="specialty-desc">
+          Odontopediatria humanizada num ambiente seguro e tranquilo, promovendo hábitos de higiene oral positivos desde a primeira infância.
+        </p>
+        <a href="#marcacao" class="specialty-link">Marcar consulta infantil <span>→</span></a>
+      </div>
+
+      <!-- Card 5: Dentisteria Estética -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">✨</div>
+        <h3 class="specialty-title">Dentisteria & Estética</h3>
+        <p class="specialty-desc">
+          Restaurações estéticas diretas em resina composta, facetas cerâmicas e branqueamento dentário seguro para devolver a luminosidade natural ao seu sorriso.
+        </p>
+        <a href="#marcacao" class="specialty-link">Avaliar estética dentária <span>→</span></a>
+      </div>
+
+      <!-- Card 6: Cirurgia Oral -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">⚕️</div>
+        <h3 class="specialty-title">Cirurgia Oral</h3>
+        <p class="specialty-desc">
+          Extrações cirúrgicas simples e complexas (dentes do siso inclusos), frenectomias e cirurgia pré-protética sob rigorosa técnica asséptica e anestesia local eficaz.
+        </p>
+        <a href="#marcacao" class="specialty-link">Agendar cirurgia oral <span>→</span></a>
+      </div>
+
+      <!-- Card 7: Prostodontia -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">🦷</div>
+        <h3 class="specialty-title">Prostodontia</h3>
+        <p class="specialty-desc">
+          Reabilitação da mastigação e fonética através de coroas em zircónia, pontes fixas e próteses esqueléticas ou acrílicas de grande precisão anatómica.
+        </p>
+        <a href="#marcacao" class="specialty-link">Reabilitação protética <span>→</span></a>
+      </div>
+
+      <!-- Card 8: Higiene Oral & Manutenção -->
+      <div class="specialty-card">
+        <div class="specialty-icon-box">💧</div>
+        <h3 class="specialty-title">Higiene Oral & Profilaxia</h3>
+        <p class="specialty-desc">
+          Remoção de tártaro ultrassónica, polimento com jato de bicarbonato e controlo periodontal para prevenção de gengivite, cáries e perda dentária.
+        </p>
+        <a href="#marcacao" class="specialty-link">Marcar destartarização <span>→</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       CORPO CLÍNICO (FACTOS VERIFICADOS NA FONTE OFICIAL)
+       ========================================================================== -->
+  <section id="corpo-clinico" class="team-section">
+    <div class="section-wrapper">
+      <div class="section-header">
+        <span class="section-tag">Experiência Médica & Deontologia</span>
+        <h2 class="section-heading">Equipa Médica Multidisciplinar</h2>
+        <p class="section-subtext">
+          Profissionais com formação contínua e vasta prática clínica, dedicados ao acompanhamento atento e personalizado de cada paciente.
+        </p>
+      </div>
+
+      <div class="doctors-grid">
+        <!-- Dr. Sancho Silvestre -->
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👨‍⚕️</span>
+            <span class="doctor-role-badge">MÉDICO DENTISTA</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Dr. Sancho Silvestre</h3>
+            <div class="doctor-specialty">Medicina Dentária & Reabilitação Oral</div>
+            <p class="doctor-bio">
+              Com foco na reabilitação estética e funcional integrada, diagnóstico minucioso e planeamento cirúrgico de precisão para tratamentos orais duradouros.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Reabilitação Oral</span>
+              <span class="doc-tag">Implantologia</span>
+              <span class="doc-tag">Oclusão</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Profª. Drª. Maria Cristina de Faria Teixeira -->
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👩‍⚕️</span>
+            <span class="doctor-role-badge">ESPECIALISTA SÉNIOR</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Profª. Drª. Maria Cristina de Faria Teixeira</h3>
+            <div class="doctor-specialty">Patologia & Medicina Oral</div>
+            <p class="doctor-bio">
+              Referência em patologia oral, diagnóstico de lesões dos tecidos moles da cavidade oral e interface entre medicina geral e saúde dentária.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Patologia Oral</span>
+              <span class="doc-tag">Medicina Oral</span>
+              <span class="doc-tag">Diagnóstico Clínico</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Dra. Beatriz Vaz Duarte -->
+        <article class="doctor-card">
+          <div class="doctor-avatar-wrap">
+            <span class="doctor-avatar-icon">👩‍⚕️</span>
+            <span class="doctor-role-badge">MÉDICA DENTISTA</span>
+          </div>
+          <div class="doctor-info">
+            <h3 class="doctor-name">Dra. Beatriz Vaz Duarte</h3>
+            <div class="doctor-specialty">Medicina Dentária Geral & Ortodontia</div>
+            <p class="doctor-bio">
+              Dedicada ao alinhamento dentário funcional, tratamentos preventivos e cuidados restauradores adaptados às necessidades individuais de cada paciente.
+            </p>
+            <div class="doctor-tags">
+              <span class="doc-tag">Ortodontia</span>
+              <span class="doc-tag">Dentisteria</span>
+              <span class="doc-tag">Prevenção</span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Banner de Tecnologia & Diagnóstico 3D -->
+      <div id="tecnologia" class="tech-banner">
+        <div class="tech-content">
+          <h3>Tecnologia Diagnóstica & Assepsia Avançada</h3>
+          <p>
+            A Clínica São Dente conta com equipamentos modernos que reduzem a exposição radiológica e asseguram a máxima previsibilidade clínica em cada intervenção.
+          </p>
+          <ul class="tech-features">
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Tomografia CBCT 3D e Radiografia Digital:</strong> exames imagiológicos tridimensionais no local para planeamento seguro.</span>
+            </li>
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Protocolos de Esterilização Classe B:</strong> ciclo de assepsia hospitalar com rastreabilidade total de materiais.</span>
+            </li>
+            <li class="tech-feature-item">
+              <span class="tech-icon-check">✓</span>
+              <span><strong>Materiais Biocompatíveis Premium:</strong> resinas e ligas certificadas para resultados estéticos de alta longevidade.</span>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <div class="tech-box-card">
+            <h4>Segurança e Bem-Estar do Paciente</h4>
+            <p>
+              Todos os gabinetes clínicos seguem normativas rigorosas de desinfeção de superfícies e ventilação contínua entre consultas, garantindo um ambiente limpo e seguro para toda a família.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       LOCALIZAÇÃO E ACESSOS (LAPA / SÃO BENTO - LISBOA)
+       ========================================================================== -->
+  <section id="localizacao" class="section-wrapper">
+    <div class="section-header">
+      <span class="section-tag">Acessibilidade e Centralidade</span>
+      <h2 class="section-heading">Localização na Lapa e São Bento</h2>
+      <p class="section-subtext">
+        Fácil acesso por transportes públicos e estacionamento na envolvente, a poucos minutos do Marquês de Pombal e do Rato.
+      </p>
+    </div>
+
+    <div class="location-grid">
+      <div class="location-details-box">
+        <div class="location-item">
+          <div class="location-icon-badge">📍</div>
+          <div>
+            <h4>Morada da Clínica</h4>
+            <p><strong>Rua Borges Carneiro, 20B</strong><br>1200-619 Lisboa, Portugal</p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">🚇</div>
+          <div>
+            <h4>Transportes Públicos</h4>
+            <p>
+              • <strong>Metro:</strong> Linha Amarela — Estação do Rato (7 min a pé)<br>
+              • <strong>Autocarros Carris:</strong> Carreiras 773 e 713<br>
+              • <strong>Eléctrico Tradicional:</strong> Linha 28E
+            </p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">📞</div>
+          <div>
+            <h4>Telefones & WhatsApp</h4>
+            <p>
+              • Fixo: <strong>(+351) 213 970 096</strong><br>
+              • Telemóvel / WhatsApp: <strong>(+351) 965 479 533</strong> / <strong>(+351) 965 479 515</strong><br>
+              • E-mail: <strong>clinica@saodente.pt</strong>
+            </p>
+          </div>
+        </div>
+
+        <div class="location-item">
+          <div class="location-icon-badge">⏰</div>
+          <div>
+            <h4>Horário de Atendimento</h4>
+            <p>
+              • <strong>Segunda a Sexta-feira:</strong> 09:00 às 19:00<br>
+              • <strong>Sábado:</strong> 09:00 às 13:00<br>
+              • <strong>Domingo e Feriados:</strong> Encerrado
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-mockup-frame">
+        <div class="map-pin-pulse">📍</div>
+        <h3 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 8px;">Clínica São Dente — Lapa</h3>
+        <p style="color: #64748b; font-size: 14px; max-width: 320px; margin-bottom: 20px;">
+          Coordenadas GPS: 38.711775, -9.157524<br>
+          Zona nobre da Lapa / São Bento, Lisboa
+        </p>
+        <a href="https://maps.google.com/?q=38.711775,-9.157524" target="_blank" rel="noopener noreferrer" class="btn-secondary-lg" style="padding: 10px 20px; font-size: 14px;">
+          <span>🗺️ Abrir no Google Maps</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       WIDGET INTERATIVO DE MARCAÇÃO DE CONSULTA
+       ========================================================================== -->
+  <section id="marcacao" class="section-wrapper booking-section">
+    <div class="section-header">
+      <span class="section-tag">Agendamento Simplificado</span>
+      <h2 class="section-heading">Marcar Consulta na Clínica São Dente</h2>
+      <p class="section-subtext">
+        Preencha os dados abaixo e a nossa equipa de receção entrará em contacto para confirmar o dia e hora de maior conveniência.
+      </p>
+    </div>
+
+    <div class="booking-card">
+      <form id="booking-form" onsubmit="handleBookingSubmit(event)">
+        <div class="booking-form-grid">
+          <div class="form-group">
+            <label for="booking-nome">Nome Completo *</label>
+            <input type="text" id="booking-nome" class="form-control" placeholder="Ex.: Maria Silva" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-telefone">Telefone ou Telemóvel *</label>
+            <input type="tel" id="booking-telefone" class="form-control" placeholder="Ex.: +351 912 345 678" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-email">E-mail *</label>
+            <input type="email" id="booking-email" class="form-control" placeholder="Ex.: maria.silva@exemplo.pt" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-especialidade">Especialidade Pretendida *</label>
+            <select id="booking-especialidade" class="form-control" required>
+              <option value="">Selecione o tratamento...</option>
+              <option value="Primeira Consulta / Check-up">Primeira Consulta / Avaliação Geral</option>
+              <option value="Ortodontia">Ortodontia (Alinhadores / Aparelhos)</option>
+              <option value="Implantes Dentários">Implantes Dentários & Reabilitação</option>
+              <option value="Patologia e Medicina Oral">Patologia & Medicina Oral</option>
+              <option value="São Dentes Kids">São Dentes Kids (Odontopediatria)</option>
+              <option value="Dentisteria e Estética">Dentisteria Estética / Branqueamento</option>
+              <option value="Cirurgia Oral">Cirurgia Oral / Extração</option>
+              <option value="Higiene Oral">Higiene Oral / Destartarização</option>
+              <option value="Radiografia ou CBCT">Exame Radiológico (CBCT 3D / Raio-X)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-periodo">Período Preferencial</label>
+            <select id="booking-periodo" class="form-control">
+              <option value="Qualquer horário">Indiferente / Primeiro horário disponível</option>
+              <option value="Manhã (09h - 13h)">Manhã (09h00 às 13h00)</option>
+              <option value="Tarde (14h - 19h)">Tarde (14h00 às 19h00)</option>
+              <option value="Sábado (09h - 13h)">Sábado de manhã (09h00 às 13h00)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-urgencia">Existe dor aguda ou urgência?</label>
+            <select id="booking-urgencia" class="form-control">
+              <option value="Não">Não — Consulta de rotina / planeada</option>
+              <option value="Sim - Dor moderada">Sim — Dor moderada / desconforto recente</option>
+              <option value="Sim - Urgência aguda">Sim — Urgência aguda (atendimento prioritário)</option>
+            </select>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <label for="booking-mensagem">Observações ou Sintomas (Opcional)</label>
+            <textarea id="booking-mensagem" class="form-control" placeholder="Descreva sucintamente o motivo do agendamento ou histórico relevante..."></textarea>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <div class="form-checkbox-wrap">
+              <input type="checkbox" id="booking-consent" required checked>
+              <label for="booking-consent">
+                Autorizo o tratamento dos meus contactos pela Clínica São Dente exclusivamente para a gestão e confirmação deste agendamento, ao abrigo da legislação de proteção de dados (RGPD).
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group booking-form-full">
+            <button type="submit" class="btn-submit-booking">
+              <span>📅 Confirmar Solicitação de Marcação</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="booking-feedback" class="form-feedback-message"></div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       FOOTER INSTITUCIONAL
+       ========================================================================== -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <h4>Clínica São Dente</h4>
+        <p>
+          Medicina Dentária e Reabilitação Oral de excelência no coração de Lisboa. Cuidados multidisciplinares na Lapa e São Bento com tecnologia de diagnóstico digital avançado.
+        </p>
+        <p style="font-size: 12px; color: #64748b;">
+          Entidade de saúde registada na Entidade Reguladora da Saúde (ERS) e profissionais inscritos na Ordem dos Médicos Dentistas (OMD).
+        </p>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Especialidades</h5>
+        <ul class="footer-links">
+          <li><a href="#especialidades">Ortodontia</a></li>
+          <li><a href="#especialidades">Implantes Dentários</a></li>
+          <li><a href="#especialidades">Patologia e Medicina Oral</a></li>
+          <li><a href="#especialidades">São Dentes Kids</a></li>
+          <li><a href="#especialidades">Dentisteria Estética</a></li>
+          <li><a href="#especialidades">Higiene Oral</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Acesso Rápido</h5>
+        <ul class="footer-links">
+          <li><a href="#corpo-clinico">Corpo Clínico</a></li>
+          <li><a href="#tecnologia">Equipamento CBCT 3D</a></li>
+          <li><a href="#localizacao">Como Chegar (Metro/Carris)</a></li>
+          <li><a href="#marcacao">Marcação Online</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h5 class="footer-heading">Contactos Oficiais</h5>
+        <ul class="footer-links">
+          <li>📍 Rua Borges Carneiro, 20B<br>1200-619 Lisboa</li>
+          <li>📞 (+351) 213 970 096 <small>(Rede Fixa)</small></li>
+          <li>📱 (+351) 965 479 533 <small>(Rede Móvel / WhatsApp)</small></li>
+          <li>✉️ clinica@saodente.pt</li>
+          <li>⏰ Seg a Sex: 9h - 19h | Sáb: 9h - 13h</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>
+        © 2026 Clínica São Dente. Todos os direitos reservados.
+      </div>
+      <div>
+        Protótipo conceitual para modernização digital • Garimpo Sites
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       BARRA FLUTUANTE DE CONVERSÃO MOBILE
+       ========================================================================== -->
+  <div class="mobile-action-bar">
+    <a href="tel:+351213970096" class="btn-mobile-act btn-mobile-call">
+      <span>📞 Ligar Agora</span>
+    </a>
+    <a href="https://wa.me/351965479533?text=Ol%C3%A1%2C%20gostaria%20de%20marcar%20uma%20consulta%20na%20Cl%C3%ADnica%20S%C3%A3o%20Dente." target="_blank" rel="noopener noreferrer" class="btn-mobile-act btn-mobile-whatsapp">
+      <span>💬 WhatsApp</span>
+    </a>
+  </div>
+
+  <!-- Scripts Interativos do Protótipo -->
+  <script>
+    function handleBookingSubmit(event) {
+      event.preventDefault();
+      const nome = document.getElementById('booking-nome').value;
+      const telefone = document.getElementById('booking-telefone').value;
+      const especialidade = document.getElementById('booking-especialidade').value;
+      const periodo = document.getElementById('booking-periodo').value;
+      const feedbackBox = document.getElementById('booking-feedback');
+
+      feedbackBox.className = 'form-feedback-message success';
+      feedbackBox.innerHTML = `
+        <strong>✔ Solicitação de Marcação Registada com Sucesso!</strong><br>
+        Obrigado, <strong>${nome}</strong>. A receção da Clínica São Dente entrará em contacto para o número <strong>${telefone}</strong> para confirmar a sua consulta de <strong>${especialidade}</strong> no período <strong>${periodo}</strong>.<br>
+        <span style="font-size: 12px; opacity: 0.9; margin-top: 4px; display: inline-block;">
+          ⚡ [Demonstração de Protótipo Visual — Nenhuma comunicação externa real foi disparada].
+        </span>
+      `;
+      feedbackBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  </script>
+
+</body>
+</html>
