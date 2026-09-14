@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DF Clínica Médica-Dentária — Campo Grande / Alvalade, Lisboa | V1</title>
+  <meta name="description" content="Protótipo de Modernização da DF Clínica Médica-Dentária no Campo Grande e Alvalade, Lisboa. Reabilitação oral avançada, implantes dentários, ortodontia invisível e medicina dentária preventiva.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ==========================================================================
+       BARRA DE CONTROLE GARIMPO SITES (PREVIEW & GOVERNANÇA)
+       ========================================================================== -->
+  <div class="control-bar" id="preview-control-bar">
+    <div class="left-group">
+      <span class="status-badge">⚡ VISUALIZAR PRÉVIA — DRAFT v1</span>
+      <span class="project-meta">Projeto: <strong>DF Clínica Médica-Dentária (Campo Grande)</strong> | Versão: <strong>v1</strong></span>
+    </div>
+    <div class="actions">
+      <a href="#especialidades" class="btn-ctrl btn-ctrl-preview" title="Explorar especialidades">👁️ ESPECIALIDADES</a>
+      <a href="#marcacao" class="btn-ctrl btn-ctrl-preview" title="Testar marcação de consulta">📅 AGENDAMENTO</a>
+      <a href="df-clinica-medica-dentaria-v1-standalone.html" download="df-clinica-medica-dentaria-v1-standalone.html" class="btn-ctrl btn-ctrl-download" title="Baixar protótipo autônomo offline">📥 BAIXAR PROTÓTIPO</a>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       TOPBAR DE CONTACTOS CLÍNICOS FACTUAIS
+       ========================================================================== -->
+  <div class="clinic-topbar">
+    <div class="clinic-topbar-info">
+      <span class="clinic-topbar-item">📍 <strong>Campo Grande / Alvalade</strong>, 1700 Lisboa</span>
+      <span class="clinic-topbar-item">📞 <strong>(+351) 217 972 040</strong> <small>(Chamada para a rede fixa nacional)</small></span>
+      <span class="clinic-topbar-item">✉️ <a href="mailto:geral@dfclinica.pt">geral@dfclinica.pt</a></span>
+      <span class="clinic-topbar-item">⏰ <strong>Seg - Sex:</strong> 09h00 - 19h30 | <strong>Sáb:</strong> 09h00 - 13h30</span>
+    </div>
+    <div>
+      <span class="clinic-topbar-badge">Atendimento Rápido e Consultas Programadas</span>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       NAVBAR PRINCIPAL
+       ========================================================================== -->
+  <header class="main-navbar">
+    <div class="navbar-container">
+      <a href="#" class="brand-logo">
+        <div class="brand-icon-box">🦷</div>
+        <div>
+          <span class="brand-title">DF Clínica Médica-Dentária</span>
+          <span class="brand-subtitle">Lisboa • Campo Grande / Alvalade</span>
+        </div>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#especialidades">Tratamentos</a></li>
+          <li><a href="#tecnologia">Tecnologia Clínica</a></li>
+          <li><a href="#localizacao">Localização</a></li>
+          <li><a href="#marcacao" class="nav-cta-btn">Agendar Avaliação</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       HERO SECTION (ALTO IMPACTO VISUAL & CONVERSÃO DIRETA)
+       ========================================================================== -->
+  <section class="hero-section">
+    <div class="hero-pattern"></div>
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-pill">
+          <span>✨</span>
+          <span>Excelência em Saúde Oral no Coração do Campo Grande</span>
+        </div>
+        <h1 class="hero-title">
+          O seu sorriso reabilitado com a <span>mais alta precisão médica</span>.
+        </h1>
+        <p class="hero-description">
+          Aliamos um corpo clínico experiente a tecnologia de diagnóstico tridimensional para tratamentos dentários confortáveis, indolores e previsíveis no Campo Grande e Alvalade.
+        </p>
+        <div class="hero-actions">
+          <a href="#marcacao" class="btn-hero-primary">📅 Marcar Primeira Consulta</a>
+          <a href="https://wa.me/351217972040?text=Olá!%20Gostaria%20de%20marcar%20uma%20consulta%20na%20DF%20Clínica." class="btn-hero-whatsapp" target="_blank" rel="noopener">💬 WhatsApp Direto</a>
+        </div>
+      </div>
+
+      <!-- Card Interativo de Prévia / Diferenciais -->
+      <div class="hero-card-preview">
+        <div class="hero-card-header">
+          <h3>Diferenciais DF Clínica</h3>
+          <span class="hero-card-badge">Padrão 2026</span>
+        </div>
+        <ul class="hero-feature-list">
+          <li class="hero-feature-item">
+            <div class="hero-feature-icon">🛡️</div>
+            <div>
+              <strong>Diagnóstico Digital 3D</strong>
+              <p>Planeamento milimétrico para implantes dentários e cirurgias guiadas com mínima invasão.</p>
+            </div>
+          </li>
+          <li class="hero-feature-item">
+            <div class="hero-feature-icon">💎</div>
+            <div>
+              <strong>Alinhadores Invisíveis</strong>
+              <p>Ortodontia moderna e discreta, sem arames e com acompanhamento digital contínuo.</p>
+            </div>
+          </li>
+          <li class="hero-feature-item">
+            <div class="hero-feature-icon">⚡</div>
+            <div>
+              <strong>Carga Imediata</strong>
+              <p>Dentes fixos no mesmo dia para devolver a confiança ao sorrir e mastigar.</p>
+            </div>
+          </li>
+          <li class="hero-feature-item">
+            <div class="hero-feature-icon">🌿</div>
+            <div>
+              <strong>Ambiente Tranquilo e Sem Dor</strong>
+              <p>Protocolos de anestesia computadorizada e acompanhamento humanizado para pacientes ansiosos.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       ESTATÍSTICAS & CONFIANÇA
+       ========================================================================== -->
+  <section class="stats-strip">
+    <div class="stats-container">
+      <div class="stat-item">
+        <h4>+<span>15</span> Anos</h4>
+        <p>Experiência Clínica</p>
+      </div>
+      <div class="stat-item">
+        <h4>+<span>8.000</span></h4>
+        <p>Sorrisos Reabilitados</p>
+      </div>
+      <div class="stat-item">
+        <h4><span>100</span>%</h4>
+        <p>Aparelhos Esterilizados</p>
+      </div>
+      <div class="stat-item">
+        <h4><span>4.9</span> ★</h4>
+        <p>Avaliação dos Pacientes</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       ESPECIALIDADES CLÍNICAS
+       ========================================================================== -->
+  <section class="section-wrapper" id="especialidades">
+    <div class="section-header">
+      <span class="section-tag">Tratamentos Especializados</span>
+      <h2 class="section-title">Soluções Completas para a Saúde e Estética do seu Sorriso</h2>
+      <p class="section-subtitle">Planos de tratamento personalizados com acompanhamento contínuo por médicos dentistas dedicados.</p>
+    </div>
+
+    <div class="specialties-grid">
+      <!-- Card 1 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">🔩</div>
+        <h3>Implantologia Avançada</h3>
+        <p>Substituição de dentes perdidos com implantes em titânio de alta biocompatibilidade e próteses fixas de máxima naturalidade.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Cirurgia guiada por computador</li>
+          <li><span>✓</span> Protocolos de carga imediata</li>
+          <li><span>✓</span> Recuperação rápida e confortável</li>
+        </ul>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">✨</div>
+        <h3>Ortodontia Invisível</h3>
+        <p>Alinhamento dentário com goteiras transparentes removíveis, impercetíveis e adaptadas à sua rotina profissional.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Simulação digital 3D do resultado</li>
+          <li><span>✓</span> Sem dor ou ferimentos na boca</li>
+          <li><span>✓</span> Higiene oral simplificada</li>
+        </ul>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">🦷</div>
+        <h3>Reabilitação Oral & Facetas</h3>
+        <p>Transformação estética através de facetas de cerâmica, coroas e branqueamento para um sorriso harmónico e rejuvenescido.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Design digital do sorriso (DSD)</li>
+          <li><span>✓</span> Cerâmicas ultra-resistentes</li>
+          <li><span>✓</span> Tons naturais adaptados à face</li>
+        </ul>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">🔬</div>
+        <h3>Endodontia Microscópica</h3>
+        <p>Tratamento e desinfeção de canais radiculares com microscópio clínico para preservação dos dentes naturais.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Precisão ótica microscópica</li>
+          <li><span>✓</span> Tratamento realizado em sessão única</li>
+          <li><span>✓</span> Alívio imediato da dor</li>
+        </ul>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">🛡️</div>
+        <h3>Periodontologia & Gengivas</h3>
+        <p>Prevenção e tratamento de gengivites e periodontites, garantindo suporte ósseo e estabilidade dental a longo prazo.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Descontaminação ultrassónica</li>
+          <li><span>✓</span> Cirurgias plásticas gengivais</li>
+          <li><span>✓</span> Manutenção preventiva periódica</li>
+        </ul>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="specialty-card">
+        <div class="specialty-icon">👶</div>
+        <h3>Odontopediatria</h3>
+        <p>Acompanhamento preventivo dedicado a crianças e adolescentes com abordagem lúdica para criar uma relação positiva com o dentista.</p>
+        <ul class="specialty-features">
+          <li><span>✓</span> Prevenção de cáries e selantes</li>
+          <li><span>✓</span> Acompanhamento do crescimento facial</li>
+          <li><span>✓</span> Ambiente calmo e acolhedor</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Banner de Tecnologia -->
+    <div class="tech-banner" id="tecnologia">
+      <div>
+        <h3>Tecnologia de Vanguarda para um Tratamento Seguro</h3>
+        <p>Na DF Clínica Médica-Dentária, o rigor técnico começa nos nossos equipamentos de diagnóstico tridimensional e protocolos de assepsia de nível hospitalar.</p>
+        <div class="tech-grid">
+          <div class="tech-item">
+            <h4>Tomografia TAC 3D</h4>
+            <p>Visão volumétrica em alta resolução com dose de radiação reduzida.</p>
+          </div>
+          <div class="tech-item">
+            <h4>Scanner Intraoral</h4>
+            <p>Moldes 100% digitais sem o desconforto das massas tradicionais.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="tech-grid">
+          <div class="tech-item">
+            <h4>Anestesia Computadorizada</h4>
+            <p>Infiltração indolor e controlada gota a gota por software.</p>
+          </div>
+          <div class="tech-item">
+            <h4>Esterilização Classe B</h4>
+            <p>Autoclaves de vácuo fracionado para rastreabilidade e segurança biológica.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       LOCALIZAÇÃO E ACESSIBILIDADE
+       ========================================================================== -->
+  <section class="location-section" id="localizacao">
+    <div class="location-grid">
+      <div class="location-info">
+        <h3>Localização Privilegiada no Campo Grande</h3>
+        <p>Estamos estrategicamente situados entre o Campo Grande e Alvalade, com fácil acesso pedonal, de transportes públicos e estacionamento na proximidade.</p>
+        
+        <div class="transport-cards">
+          <div class="transport-item">
+            <div class="transport-icon">🚇</div>
+            <div class="transport-text">
+              <h4>Metropolitano de Lisboa</h4>
+              <p>Estações Campo Grande (Linha Amarela e Verde) e Entrecampos a poucos minutos a pé.</p>
+            </div>
+          </div>
+          <div class="transport-item">
+            <div class="transport-icon">🚌</div>
+            <div class="transport-text">
+              <h4>Autocarros Carris</h4>
+              <p>Linhas 701, 736, 738, 767 e 783 com paragem à porta da clínica.</p>
+            </div>
+          </div>
+          <div class="transport-item">
+            <div class="transport-icon">🚗</div>
+            <div class="transport-text">
+              <h4>Estacionamento</h4>
+              <p>Parque de estacionamento coberto e zonas de parqueamento EMEL nas imediações.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-placeholder-box">
+        <div class="map-icon">📍</div>
+        <h4>DF Clínica Médica-Dentária</h4>
+        <p>Campo Grande / Alvalade, 1700 Lisboa<br>Telefone: (+351) 217 972 040</p>
+        <a href="https://maps.google.com/?q=Campo+Grande+Lisboa" target="_blank" rel="noopener" class="btn-ctrl btn-ctrl-download">Abrir no Google Maps</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       FORMULÁRIO DE MARCAÇÃO INTERATIVO
+       ========================================================================== -->
+  <section class="booking-section" id="marcacao">
+    <div class="booking-card">
+      <div class="booking-header">
+        <h3>Agende a sua Avaliação Clínica</h3>
+        <p>Preencha os seus dados para entrarmos em contacto e confirmarmos o seu horário preferido.</p>
+      </div>
+
+      <form class="booking-form" id="consultationForm" onsubmit="event.preventDefault(); handleBookingSubmit();">
+        <div class="form-group">
+          <label for="patientName">Nome Completo *</label>
+          <input type="text" id="patientName" class="form-control" placeholder="ex: Maria Silva" required>
+        </div>
+
+        <div class="form-group">
+          <label for="patientPhone">Telemóvel / WhatsApp *</label>
+          <input type="tel" id="patientPhone" class="form-control" placeholder="ex: 912 345 678" required>
+        </div>
+
+        <div class="form-group">
+          <label for="patientEmail">Email de Contacto</label>
+          <input type="email" id="patientEmail" class="form-control" placeholder="ex: maria@exemplo.pt">
+        </div>
+
+        <div class="form-group">
+          <label for="treatmentType">Tratamento Pretendido</label>
+          <select id="treatmentType" class="form-control">
+            <option value="avaliacao_geral">Primeira Consulta / Avaliação Geral</option>
+            <option value="implantes">Implantes Dentários & Carga Imediata</option>
+            <option value="ortodontia">Ortodontia Invisível / Alinhadores</option>
+            <option value="estetica">Estética Dental & Facetas</option>
+            <option value="dor_urgencia">Dor de Dentes / Urgência</option>
+            <option value="outro">Outro Tratamento</option>
+          </select>
+        </div>
+
+        <div class="form-group form-group-full">
+          <label for="patientNotes">Observações ou Horário de Preferência</label>
+          <textarea id="patientNotes" class="form-control" rows="3" placeholder="Indique se prefere marcação de manhã ou tarde, ou descreva a sua necessidade."></textarea>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnSubmitForm">Confirmar Pedido de Agendamento</button>
+
+        <p class="form-notice">🔒 Os seus dados estão protegidos pelo RGPD e serão utilizados exclusivamente para agendamento na DF Clínica Médica-Dentária.</p>
+      </form>
+
+      <div id="formSuccessMessage" style="display: none; text-align: center; padding: 20px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; margin-top: 20px;">
+        <h4 style="color: #166534; margin-bottom: 6px;">✅ Pedido de Agendamento Recebido com Sucesso!</h4>
+        <p style="color: #15803d; font-size: 14px;">A nossa equipa entrará em contacto dentro do horário de expediente para confirmar o dia e hora.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       FOOTER INSTITUCIONAL
+       ========================================================================== -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <h4>DF Clínica Médica-Dentária</h4>
+        <p>Compromisso com a saúde oral, inovação e bem-estar dos nossos pacientes em Lisboa (Campo Grande / Alvalade).</p>
+      </div>
+
+      <div class="footer-col">
+        <h5>Especialidades</h5>
+        <ul>
+          <li><a href="#especialidades">Implantologia</a></li>
+          <li><a href="#especialidades">Ortodontia Invisível</a></li>
+          <li><a href="#especialidades">Reabilitação Oral</a></li>
+          <li><a href="#especialidades">Endodontia</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Acesso Rápido</h5>
+        <ul>
+          <li><a href="#especialidades">Tratamentos</a></li>
+          <li><a href="#tecnologia">Tecnologia Clínica</a></li>
+          <li><a href="#localizacao">Como Chegar</a></li>
+          <li><a href="#marcacao">Agendamento</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Contactos</h5>
+        <ul>
+          <li>📞 (+351) 217 972 040</li>
+          <li>✉️ geral@dfclinica.pt</li>
+          <li>📍 Campo Grande, Lisboa</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© 2026 DF Clínica Médica-Dentária. Todos os direitos reservados.</span>
+      <span>Protótipo de Redesign Técnico • Garimpo Sites</span>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       BARRA FLUTUANTE DE CONVERSÃO MOBILE
+       ========================================================================== -->
+  <aside class="mobile-conversion-bar" aria-label="Contacto Rápido">
+    <div class="mobile-conversion-bar-inner">
+      <a href="tel:+351217972040" class="mobile-btn mobile-btn-call">
+        <span>📞</span> Ligar Agora
+      </a>
+      <a href="https://wa.me/351217972040?text=Olá!%20Gostaria%20de%20marcar%20uma%20consulta%20na%20DF%20Clínica." class="mobile-btn mobile-btn-wa" target="_blank" rel="noopener">
+        <span>💬</span> WhatsApp
+      </a>
+    </div>
+  </aside>
+
+  <!-- Script Interativo Seguro -->
+  <script>
+    function handleBookingSubmit() {
+      const name = document.getElementById('patientName').value;
+      const phone = document.getElementById('patientPhone').value;
+      const form = document.getElementById('consultationForm');
+      const successMsg = document.getElementById('formSuccessMessage');
+
+      if (!name || !phone) {
+        alert('Por favor, preencha o seu nome e contacto de telemóvel.');
+        return;
+      }
+
+      form.style.display = 'none';
+      successMsg.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
